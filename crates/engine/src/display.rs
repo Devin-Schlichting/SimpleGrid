@@ -67,10 +67,18 @@ pub fn edit_text(wb: &Workbook, sheet: &Sheet, c: CellRef) -> String {
     {
         return format!("'{raw}");
     }
+    let german = simplegrid_core::locale::german();
+    if german && cell.formula.is_none() && let Value::Bool(b) = &cell.value {
+        return if *b { "WAHR" } else { "FALSCH" }.into();
+    }
     let Value::Number(n) = &cell.value else { return raw };
     let code = wb.styles.get(cell.style).num_fmt.as_str();
-    if cell.formula.is_some() || !parsed(code).is_date() {
+    if cell.formula.is_some() {
         return raw;
+    }
+    if !parsed(code).is_date() {
+        // SimpleGrid: im Bearbeitungsfeld mit Dezimalkomma (12,5), damit es so zurückgelesen wird.
+        return if german { simplegrid_core::locale::edit_number_text(&raw) } else { raw };
     }
     let reads_back = |s: &str| matches!(simplegrid_core::parse::parse_input(s, wb.date_system).value, Value::Number(m) if (m - n).abs() < 1e-9);
     let shown = format(&cell.value, code, wb).text;

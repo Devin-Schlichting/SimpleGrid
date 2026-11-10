@@ -86,7 +86,6 @@ fn knopf(ui: &mut Ui, text: &str, tipp: &str, aus: Option<&str>, an: bool) -> bo
     r.clicked()
 }
 
-#[allow(dead_code)] // wird ab Phase 3 von weiteren Gruppen genutzt
 /// Eine Schaltfläche, die einen Engine-Befehl ausführt; gesperrt, solange der Befehl nicht geht.
 fn befehl(app: &mut SheetApp, ui: &mut Ui, text: &str, tipp: &str, id: &str, params: Json) {
     let aus = gesperrt(app, id).map(|_| texte::NICHT_MOEGLICH.to_string());
@@ -116,6 +115,7 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             gruppe(ui, "Datei", |ui| datei(app, ui));
+            gruppe(ui, "Bearbeiten", |ui| bearbeiten(app, ui));
             gruppe(ui, "Tabellenblatt", |ui| blaetter(app, ui));
         });
     });
@@ -220,6 +220,30 @@ pub fn oeffnen_pfad(app: &mut SheetApp, pfad: &str) {
         n.text = texte::IMPORT_HINWEIS.into();
         n.action = None;
     }
+}
+
+fn bearbeiten(app: &mut SheetApp, ui: &mut Ui) {
+    let undo_aus = gesperrt(app, "edit.undo").map(|_| "Es gibt nichts rückgängig zu machen.");
+    if knopf(ui, "↶ Rückgängig", "Den letzten Schritt zurücknehmen (auch Strg+Z)", undo_aus, false) {
+        app.run_or_alert("edit.undo", json!({}));
+    }
+    let redo_aus = gesperrt(app, "edit.redo").map(|_| "Es gibt nichts zu wiederholen.");
+    if knopf(ui, "↷ Wiederholen", "Den zurückgenommenen Schritt wiederholen (auch Strg+Y)", redo_aus, false) {
+        app.run_or_alert("edit.redo", json!({}));
+    }
+    let ohne = gesperrt(app, "edit.copy").map(|_| texte::NICHT_MOEGLICH);
+    if knopf(ui, "Kopieren", "Die markierten Zellen kopieren (auch Strg+C)", ohne, false) {
+        let ctx = ui.ctx().clone();
+        app.copy_to_clipboard(&ctx, "edit.copy");
+    }
+    if knopf(ui, "Ausschneiden", "Die markierten Zellen ausschneiden, um sie woanders einzufügen (auch Strg+X)", ohne, false) {
+        let ctx = ui.ctx().clone();
+        app.copy_to_clipboard(&ctx, "edit.cut");
+    }
+    if knopf(ui, "Einfügen", "Das Kopierte an der markierten Stelle einfügen, mit Formatierung (auch Strg+V)", ohne, false) {
+        app.paste_from_clipboard();
+    }
+    befehl(app, ui, "Inhalt löschen", "Den Inhalt der markierten Zellen löschen (auch Entf)", "edit.clearContents", json!({}));
 }
 
 fn blaetter(app: &mut SheetApp, ui: &mut Ui) {
@@ -523,6 +547,87 @@ mod tests {
         let text = |a: &mut SheetApp, c: &str| a.session.execute("cell.get", json!({"cell": c})).map(|v| v["text"].clone()).unwrap_or(Json::Null);
         assert_eq!(text(&mut a, "A1"), json!("1.234,50"));
         assert_eq!(text(&mut a, "A2"), json!("12,50 €"));
+    }
+
+    #[test]
+    fn eingeben_loeschen_rueckgaengig_wiederholen() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "Hallo"}));
+        a.run_or_alert("selection.set", json!({"cell": "A1"}));
+        a.run_or_alert("edit.clearContents", json!({}));
+        assert_eq!(wert(&mut a, "A1"), Json::Null);
+        a.run_or_alert("edit.undo", json!({}));
+        assert_eq!(wert(&mut a, "A1"), json!("Hallo"));
+        a.run_or_alert("edit.redo", json!({}));
+        assert_eq!(wert(&mut a, "A1"), Json::Null);
+    }
+
+    #[test]
+    fn fuenfzig_schritte_zurueck() {
+        let mut a = app();
+        for i in 1..=60 {
+            a.run_or_alert("cell.set", json!({"cell": "A1", "input": i.to_string()}));
+        }
+        for _ in 0..50 {
+            a.run_or_alert("edit.undo", json!({}));
+        }
+        assert_eq!(wert(&mut a, "A1"), json!(10.0));
+        for _ in 0..50 {
+            a.run_or_alert("edit.redo", json!({}));
+        }
+        assert_eq!(wert(&mut a, "A1"), json!(60.0));
+    }
+
+    #[test]
+    fn kopieren_und_einfuegen_mit_format_auch_auf_anderes_blatt() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "12,5 €"}));
+        a.run_or_alert("home.bold", json!({"range": "A1"}));
+        a.run_or_alert("selection.set", json!({"range": "A1"}));
+        a.run_or_alert("edit.copy", json!({}));
+        a.run_or_alert("home.insertSheet", json!({"before": 1}));
+        a.run_or_alert("selection.set", json!({"cell": "C3"}));
+        a.run_or_alert("edit.paste", json!({}));
+        assert_eq!(wert(&mut a, "C3"), json!(12.5));
+        let st = a.session.execute("cell.get", json!({"cell": "C3"})).unwrap_or_default();
+        assert_eq!(st["text"], json!("12,50 €"));
+        assert_eq!(st["style"]["font"]["bold"], json!(true), "{st}");
+        a.run_or_alert("edit.undo", json!({}));
+        assert_eq!(wert(&mut a, "C3"), Json::Null);
+    }
+
+    #[test]
+    fn ausschneiden_verschiebt() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "weg"}));
+        a.run_or_alert("selection.set", json!({"range": "A1"}));
+        a.run_or_alert("edit.cut", json!({}));
+        a.run_or_alert("selection.set", json!({"cell": "B2"}));
+        a.run_or_alert("edit.paste", json!({}));
+        assert_eq!(wert(&mut a, "A1"), Json::Null);
+        assert_eq!(wert(&mut a, "B2"), json!("weg"));
+    }
+
+    #[test]
+    fn text_aus_anderem_programm_mit_tabulatoren() {
+        let mut a = app();
+        a.run_or_alert("selection.set", json!({"cell": "A1"}));
+        a.paste_external("1,5	Apfel
+2.000	3,25 €".into());
+        assert_eq!(wert(&mut a, "A1"), json!(1.5));
+        assert_eq!(wert(&mut a, "B1"), json!("Apfel"));
+        assert_eq!(wert(&mut a, "A2"), json!(2000.0));
+        assert_eq!(wert(&mut a, "B2"), json!(3.25));
+    }
+
+    #[test]
+    fn bearbeitungstext_mit_komma() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "12,5"}));
+        let v = a.session.execute("cell.get", json!({"cell": "A1"})).unwrap_or_default();
+        assert_eq!(v["text"], json!("12,5"));
+        let d = a.session.active().map(|d| simplegrid_engine::display::edit_text(&d.wb, d.wb.active().unwrap_or_else(|| unreachable!()), simplegrid_engine::core::CellRef::new(0, 0)));
+        assert_eq!(d.as_deref(), Some("12,5"));
     }
 
     #[test]

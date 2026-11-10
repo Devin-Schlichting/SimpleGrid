@@ -39,3 +39,12 @@
   `10.11.2026`, `WAHR`/`FALSCH`; Anzeige `1.234,56 €`. Gespeichert wird weiter neutral (Dateien wie bisher).
 - Tests: Round-Trip xlsx, ods mit Formaten → xlsx, kaputte Datei, deutsche Zahlen. 3106 Tests grün.
 - Offen: Beispieldateien des Opas zum Prüfen des Imports.
+
+## Phase 3 – Bearbeiten, Zwischenablage, Rückgängig (2026-11-10)
+- Leiste „Bearbeiten“: Rückgängig, Wiederholen, Kopieren, Ausschneiden, Einfügen (mit Format), Inhalt löschen –
+  alles GridCraft-Befehle; gesperrt mit Hinweis („Es gibt nichts rückgängig zu machen.“).
+- Rückgängig: GridCraft hält 100 Schritte (Anleitung: mindestens 50).
+- Bearbeitungsfeld zeigt Zahlen mit Komma (`12,5`) und WAHR/FALSCH.
+- Bilder aus der Zwischenablage werden nicht mehr eingefügt (nur Zellen und Text).
+- Tests: Eingabe/Löschen/Rückgängig/Wiederholen, 50 Schritte, Kopieren mit Format auf anderes Blatt, Ausschneiden,
+  tabgetrennter Text aus anderen Programmen mit deutschen Zahlen.

@@ -55,10 +55,8 @@ impl SheetApp {
         match self.system_clipboard_text() {
             Some(text) if self.session.clipboard.is_none() || self.clipboard_text_at_copy.as_ref() != Some(&text) => self.paste_external(text),
             Some(_) => self.run_or_alert("edit.paste", json!({})),
-            None => match self.services.paste_image.as_mut().and_then(|read| read()) {
-                Some(image) => self.paste_picture(image),
-                None => self.run_or_alert("edit.paste", json!({})),
-            },
+            // SimpleGrid fügt keine Bilder ein: nur Zellen und Text.
+            None => self.run_or_alert("edit.paste", json!({})),
         }
     }
 

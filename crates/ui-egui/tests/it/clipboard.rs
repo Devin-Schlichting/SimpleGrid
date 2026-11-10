@@ -251,48 +251,6 @@ fn pictures(h: &Harness) -> Vec<(String, f32, f32, String)> {
     sh.images.iter().map(|i| (i.anchor.cell.a1(), i.anchor.width, i.anchor.height, i.mime.clone())).collect()
 }
 
-#[test]
-fn cmd_v_with_a_picture_on_the_clipboard_inserts_it_at_the_active_cell() {
-    // A screenshot or a browser image: the clipboard has pixels and no text (#699, #3018, #3182).
-    let mut h = harness(Services::default());
-    h.state_mut().run("selection.set", json!({"cell": "C5"})).unwrap();
-    let image = egui::ColorImage::new([4, 3], vec![egui::Color32::from_rgb(200, 30, 30); 12]);
-    h.input_mut().events.push(Event::PasteImage(std::sync::Arc::new(image)));
-    h.run_steps(2);
-    assert!(h.state().message.is_none(), "{:?}", h.state().message);
-    assert_eq!(pictures(&h), vec![("C5".to_string(), 4.0, 3.0, "image/png".to_string())]);
-    let sh = h.state().session.active().unwrap().wb.active().unwrap();
-    let png = image::load_from_memory(&sh.images[0].data).unwrap().to_rgba8();
-    assert_eq!(png.get_pixel(3, 2).0, [200, 30, 30, 255], "the pixels survive the PNG round trip");
 
-    // One undo step removes it.
-    h.state_mut().run("edit.undo", json!({})).unwrap();
-    assert!(pictures(&h).is_empty());
-}
-
-#[test]
-fn a_malformed_clipboard_picture_is_refused_without_inserting() {
-    let mut h = harness(Services::default());
-    let mut image = egui::ColorImage::new([4, 3], vec![egui::Color32::WHITE; 12]);
-    image.pixels.truncate(5);
-    h.input_mut().events.push(Event::PasteImage(std::sync::Arc::new(image)));
-    h.run_steps(2);
-    assert!(pictures(&h).is_empty());
-    assert!(h.state().message.is_some(), "the user is told the paste failed");
-
-    dismiss(&mut h);
-    h.input_mut().events.push(Event::PasteImage(std::sync::Arc::new(egui::ColorImage::new([0, 0], Vec::new()))));
-    h.run_steps(2);
-    assert!(pictures(&h).is_empty());
-
-    // Wider than the 16384-pixel limit: refused before its pixels are copied.
-    dismiss(&mut h);
-    let wide = egui::ColorImage::new([20_000, 1], vec![egui::Color32::WHITE; 20_000]);
-    h.input_mut().events.push(Event::PasteImage(std::sync::Arc::new(wide)));
-    h.run_steps(2);
-    assert!(pictures(&h).is_empty());
-    let message = format!("{:?}", h.state().message);
-    assert!(message.contains("too large"), "{message}");
-}
 
 
