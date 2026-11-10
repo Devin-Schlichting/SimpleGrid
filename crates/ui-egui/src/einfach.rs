@@ -540,6 +540,11 @@ fn ansicht(app: &mut SheetApp, ui: &mut Ui) {
     }
 }
 
+/// Der Fenstertitel: „Haushalt.xlsx – SimpleGrid“, mit Hinweis, solange etwas nicht gespeichert ist.
+pub fn fenstertitel(titel: &str, ungespeichert: bool) -> String {
+    if ungespeichert { format!("{titel} (nicht gespeichert) – SimpleGrid") } else { format!("{titel} – SimpleGrid") }
+}
+
 /// Merkt sich die gespeicherte Datei der aktiven Tabelle als „zuletzt benutzt“.
 pub fn zuletzt_merken(app: &mut SheetApp) {
     let Some(pfad) = app.session.active().and_then(|d| d.path.clone()) else { return };

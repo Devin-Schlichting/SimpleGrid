@@ -128,3 +128,12 @@
 - Tests: Update-Dienst mit Test-Quelle (neuer, gleich, kaputte Prüfsumme, kein Netz, Limit, GitHub-Antwort).
 - Noch nicht gemacht (braucht dein OK): Inno Setup installieren und Installer bauen/ausprobieren,
   Push auf GitHub, erste Release und Probe-Update mit zwei Testversionen.
+
+### Nachtrag Phase 9 – Installer geprüft (2026-11-10)
+- `installer\bauen.ps1` baut `dist\SimpleGrid-Setup.exe` (≈13 MB) und `dist\versionen.json`.
+- Stille Installation als normaler Benutzer: Exit 0, Programm unter `%LocalAppData%\Programs\SimpleGrid`,
+  Uninstall-Eintrag nur in HKCU (keine Adminrechte), Startmenü- und Desktop-Verknüpfung, .xlsx-Zuordnung aus.
+- Installiertes Programm startet und schließt normal.
+- Stille Deinstallation: Ordner, Verknüpfungen, Registry-Eintrag, Einstellungen und Sicherungen entfernt.
+- Fenstertitel jetzt „Mappe1 – SimpleGrid“ bzw. „… (nicht gespeichert) – SimpleGrid“ (vorher englisch „— Edited“).
+- Noch offen: Probe-Update über zwei echte GitHub-Releases (braucht Push und Release).

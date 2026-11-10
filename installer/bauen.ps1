@@ -21,7 +21,8 @@ if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version muss Haupt.Neben.Fehl
 Write-Host "SimpleGrid $Version"
 
 # Version in Cargo.toml eintragen, damit das Programm sie selbst kennt.
-(Get-Content Cargo.toml) -replace '^version = ".*"', "version = `"$Version`"" | Set-Content Cargo.toml -Encoding utf8
+$Toml = ((Get-Content Cargo.toml) -replace '^version = ".*"', "version = `"$Version`"") -join "`n"
+[System.IO.File]::WriteAllText("$Wurzel\Cargo.toml", "$Toml`n", (New-Object System.Text.UTF8Encoding $false))
 
 if (-not $OhneTests) {
     cargo test --workspace

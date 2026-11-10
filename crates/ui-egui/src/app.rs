@@ -163,7 +163,7 @@ impl SheetApp {
             return;
         }
         let Some(d) = self.session.active() else { return };
-        let title = format!("{}{}", d.display_title(), if d.is_dirty() { " — Edited" } else { "" });
+        let title = einfach::fenstertitel(&d.display_title(), d.is_dirty());
         if self.grid.last_title.as_deref() != Some(title.as_str()) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.grid.last_title = Some(title);
@@ -497,14 +497,14 @@ mod lifecycle_tests {
         let mut app = app();
         let first = ctx.run_logic(&egui::RawInput::default(), |ctx| app.logic(ctx));
         let title = app.session.active().unwrap().display_title().to_string();
-        let expected = format!("{title}{}", if app.session.active().unwrap().is_dirty() { " — Edited" } else { "" });
+        let expected = crate::einfach::fenstertitel(&title, app.session.active().unwrap().is_dirty());
         assert_eq!(titles(&first), [expected], "the first logic tick titles the window");
         let second = ctx.run_logic(&egui::RawInput::default(), |ctx| app.logic(ctx));
         assert!(titles(&second).is_empty(), "an unchanged title is not sent every frame");
 
         app.session.active_mut().unwrap().title = "Renamed".into();
         let third = ctx.run_logic(&egui::RawInput::default(), |ctx| app.logic(ctx));
-        let expected = format!("Renamed{}", if app.session.active().unwrap().is_dirty() { " — Edited" } else { "" });
+        let expected = crate::einfach::fenstertitel("Renamed", app.session.active().unwrap().is_dirty());
         assert_eq!(titles(&third), [expected], "a rename while hidden updates the title");
     }
 
