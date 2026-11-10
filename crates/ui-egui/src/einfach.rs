@@ -100,6 +100,8 @@ pub struct Zustand {
     pub update_laden: bool,
     /// Das gewählte Register der Leiste.
     pub register: Register,
+    /// Zelle, in der eine Summe zum Bestätigen steht (grüner Haken / rotes Kreuz daneben).
+    pub summe_ziel: Option<simplegrid_engine::core::CellRef>,
 }
 
 /// Schriftgrößen zur Auswahl (feste Stufen).
@@ -385,6 +387,12 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
                             ("Alles gespeichert", t.accent)
                         };
                         ui.label(RichText::new(text).font(theme::ui_bold(17.0)).color(farbe));
+                        ui.add_space(16.0);
+                        // Neu, Öffnen, Speichern, Speichern unter: immer sichtbar, unabhängig vom Register.
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 8.0;
+                            datei(app, ui);
+                        });
                     });
                 });
             });
@@ -436,8 +444,6 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
                 ui.spacing_mut().button_padding = vec2(14.0, 8.0);
                 match app.einfach.register {
                     Register::Start => {
-                        datei(app, ui);
-                        trenner(ui);
                         bearbeiten(app, ui);
                         trenner(ui);
                         rechnen(app, ui);
@@ -518,20 +524,56 @@ pub fn fusszeile(app: &mut SheetApp, ui: &mut Ui) {
     });
 }
 
+/// Neu, Öffnen, Speichern, Speichern unter. Die Kopfzeile zeichnet sie von rechts nach links,
+/// daher werden sie hier in umgekehrter Reihenfolge angelegt (sichtbar bleibt: Neu … Speichern unter).
 fn datei(app: &mut SheetApp, ui: &mut Ui) {
-    if knopf(ui, "Neu", "Eine neue, leere Tabelle anfangen", None, false) {
-        neu_oder_oeffnen(app, Danach::Neu);
-    }
-    if knopf(ui, "Öffnen", "Eine gespeicherte Tabelle öffnen (.xlsx oder .ods)", None, false) {
-        neu_oder_oeffnen(app, Danach::Oeffnen);
-    }
     let ohne_mappe = app.session.active().is_none().then_some(texte::NICHT_MOEGLICH);
-    if knopf(ui, "Speichern", "Die Tabelle speichern", ohne_mappe, false) {
-        speichern(app);
-    }
-    if knopf(ui, "Speichern unter", "Die Tabelle unter einem neuen Namen oder an einem anderen Ort speichern", ohne_mappe, false) {
+    if kopfknopf(ui, "Speichern unter", "Die Tabelle unter einem neuen Namen oder an einem anderen Ort speichern", ohne_mappe) {
         speichern_unter(app);
     }
+    if kopfknopf(ui, "Speichern", "Die Tabelle speichern", ohne_mappe) {
+        speichern(app);
+    }
+    if kopfknopf(ui, "Öffnen", "Eine gespeicherte Tabelle öffnen (.xlsx oder .ods)", None) {
+        neu_oder_oeffnen(app, Danach::Oeffnen);
+    }
+    if kopfknopf(ui, "Neu", "Eine neue, leere Tabelle anfangen", None) {
+        neu_oder_oeffnen(app, Danach::Neu);
+    }
+}
+
+/// Ein Knopf der Kopfzeile: Icon links, Text rechts, gut greifbar, aber flacher als die Kacheln.
+fn kopfknopf(ui: &mut Ui, text: &str, tipp: &str, aus: Option<&str>) -> bool {
+    let t = Tokens::get(ui.ctx());
+    let farbe = if aus.is_some() { t.text_disabled } else { t.text };
+    let galley = ui.painter().layout_no_wrap(text.to_string(), theme::ui_bold(masse::SCHRIFT), farbe);
+    let icon = 24.0;
+    let breite = 14.0 + icon + 8.0 + galley.size().x + 16.0;
+    let sense = if aus.is_some() { egui::Sense::hover() } else { egui::Sense::click() };
+    let (rect, r) = ui.allocate_exact_size(vec2(breite, 48.0), sense);
+    let (fill, rand) = if aus.is_none() && r.is_pointer_button_down_on() {
+        (t.pressed, t.accent)
+    } else if aus.is_none() && r.hovered() {
+        (t.accent_soft, t.accent)
+    } else {
+        (egui::Color32::WHITE, t.ribbon_border)
+    };
+    let p = ui.painter();
+    p.rect(rect, 10.0, fill, egui::Stroke::new(if r.hovered() { 2.5 } else { 1.5 }, rand), egui::StrokeKind::Inside);
+    if r.has_focus() {
+        p.rect_stroke(rect.expand(3.0), 12.0, egui::Stroke::new(3.0, egui::Color32::from_rgb(0xF5, 0x9E, 0x0B)), egui::StrokeKind::Outside);
+    }
+    if let Some(sym) = symbol(text) {
+        let mitte = egui::pos2(rect.left() + 14.0 + icon / 2.0, rect.center().y);
+        crate::icons::paint(p, egui::Rect::from_center_size(mitte, vec2(icon, icon)), sym, if aus.is_some() { t.text_disabled } else { t.accent });
+    }
+    p.galley(egui::pos2(rect.left() + 14.0 + icon + 8.0, rect.center().y - galley.size().y / 2.0), galley, farbe);
+    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, aus.is_none(), text));
+    let r = match aus {
+        Some(grund) => r.on_hover_text(format!("{tipp}\n\n{grund}")),
+        None => r.on_hover_text(tipp),
+    };
+    aus.is_none() && r.clicked()
 }
 
 /// Ob die aktive Mappe als .xlsx-Datei gespeichert ist (dann speichert „Speichern“ direkt dorthin).
@@ -962,43 +1004,130 @@ fn rechnen(app: &mut SheetApp, ui: &mut Ui) {
     }
 }
 
-/// „Summe“: Ist eine Zahl in einer Zahlenspalte markiert, wird der zusammenhängende Zahlenbereich
-/// erkannt und die Summe in die nächste freie Zelle darunter geschrieben. Sonst gilt GridCraft's
-/// AutoSumme (Bereich: Summen darunter bzw. rechts; leere Zelle: Zahlen darüber oder links).
+/// Wohin die Summe kommt und welcher Bereich zusammengezählt wird – oder `None`, wenn das nicht
+/// eindeutig ist (dann rechnet GridCraft's AutoSumme direkt, z. B. für mehrere Spalten auf einmal).
+pub fn summe_ziel(app: &SheetApp) -> Option<(simplegrid_engine::core::CellRef, simplegrid_engine::core::RangeRef)> {
+    use simplegrid_engine::core::{CellRef, MAX_COLS, MAX_ROWS, RangeRef, Value};
+    let d = app.session.active()?;
+    let sh = d.wb.active()?;
+    let r = d.selection.current();
+    let zahl = |c: CellRef| matches!(sh.value(c), Value::Number(_));
+    let leer = |c: CellRef| sh.value(c) == Value::Empty;
+    // Nächste freie Zelle unterhalb von `zeile` bzw. rechts von `spalte`.
+    let frei_unter = |zeile: u32, spalte: u32| (zeile + 1..MAX_ROWS).map(|z| CellRef::new(z, spalte)).find(|c| leer(*c));
+    let frei_rechts = |zeile: u32, spalte: u32| (spalte + 1..MAX_COLS).map(|s| CellRef::new(zeile, s)).find(|c| leer(*c));
+    if r.is_single() {
+        let c = r.start;
+        if zahl(c) {
+            // Eine Zahl in einer Zahlenspalte: den zusammenhängenden Zahlenbereich erkennen.
+            let mut oben = c.row;
+            while oben > 0 && zahl(CellRef::new(oben - 1, c.col)) {
+                oben -= 1;
+            }
+            let mut unten = c.row;
+            while unten + 1 < MAX_ROWS && zahl(CellRef::new(unten + 1, c.col)) {
+                unten += 1;
+            }
+            let ziel = CellRef::new(unten + 1, c.col);
+            return (unten + 1 < MAX_ROWS && leer(ziel)).then(|| (ziel, RangeRef::new(CellRef::new(oben, c.col), CellRef::new(unten, c.col))));
+        }
+        if !leer(c) {
+            return None;
+        }
+        // Leere Zelle: Zahlen direkt darüber, sonst direkt links davon.
+        if c.row > 0 && zahl(CellRef::new(c.row - 1, c.col)) {
+            let mut oben = c.row - 1;
+            while oben > 0 && zahl(CellRef::new(oben - 1, c.col)) {
+                oben -= 1;
+            }
+            return Some((c, RangeRef::new(CellRef::new(oben, c.col), CellRef::new(c.row - 1, c.col))));
+        }
+        if c.col > 0 && zahl(CellRef::new(c.row, c.col - 1)) {
+            let mut links = c.col - 1;
+            while links > 0 && zahl(CellRef::new(c.row, links - 1)) {
+                links -= 1;
+            }
+            return Some((c, RangeRef::new(CellRef::new(c.row, links), CellRef::new(c.row, c.col - 1))));
+        }
+        return None;
+    }
+    if r.start.col == r.end.col {
+        // Eine Spalte markiert: Summe darunter.
+        return frei_unter(r.end.row, r.start.col).map(|z| (z, r));
+    }
+    if r.start.row == r.end.row {
+        // Eine Zeile markiert: Summe rechts daneben.
+        return frei_rechts(r.start.row, r.end.col).map(|z| (z, r));
+    }
+    None
+}
+
+/// „Summe“: Die Formel (z. B. `=SUMME(B2:B4)`) wird in die Zielzelle geschrieben und zum
+/// Bestätigen vorgelegt – mit Enter oder dem grünen Haken übernehmen, mit Esc oder dem roten
+/// Kreuz verwerfen. Ist das Ziel nicht eindeutig (mehrere Spalten), rechnet GridCraft's AutoSumme direkt.
 pub fn summe(app: &mut SheetApp) {
-    use simplegrid_engine::core::{CellRef, RangeRef, Value};
     if !app.commit_edit(0, 0, false, false) {
         return;
     }
-    let ziel = app.session.active().and_then(|d| {
-        let r = d.selection.current();
-        if !r.is_single() {
-            return None;
-        }
-        let sh = d.wb.active()?;
-        let zahl = |row: u32| matches!(sh.value(CellRef::new(row, r.start.col)), Value::Number(_));
-        if !zahl(r.start.row) {
-            return None;
-        }
-        let mut oben = r.start.row;
-        while oben > 0 && zahl(oben - 1) {
-            oben -= 1;
-        }
-        let mut unten = r.start.row;
-        while unten + 1 < simplegrid_engine::core::MAX_ROWS && zahl(unten + 1) {
-            unten += 1;
-        }
-        let frei = unten + 1;
-        let bereich = RangeRef::new(CellRef::new(oben, r.start.col), CellRef::new(unten, r.start.col));
-        (frei < simplegrid_engine::core::MAX_ROWS && sh.value(CellRef::new(frei, r.start.col)) == Value::Empty)
-            .then(|| (CellRef::new(frei, r.start.col), bereich))
-    });
-    match ziel {
+    match summe_ziel(app) {
         Some((zelle, bereich)) => {
-            app.run_or_alert("cell.set", json!({"cell": zelle.a1(), "input": format!("=SUM({})", bereich.a1())}));
             app.run_or_alert("selection.set", json!({"cell": zelle.a1()}));
+            // Funktionsname in der Sprache der Oberfläche (deutsch: SUMME), gespeichert wird SUM.
+            let name = app.ui.language.formula_locale().function_name("SUM").to_string();
+            app.begin_edit(Some(format!("={name}({})", bereich.a1())), false);
+            app.einfach.summe_ziel = app.editor.as_ref().map(|e| e.cell);
         }
         None => app.run_or_alert("formulas.autoSum", json!({})),
+    }
+}
+
+/// Grüner Haken und rotes Kreuz neben der Zelle, die gerade bearbeitet wird (jede Eingabe, auch
+/// eine vorgelegte Summe): übernehmen wie Enter, verwerfen wie Esc – ganz ohne Tastatur.
+fn eingabe_knoepfe(app: &mut SheetApp, ctx: &egui::Context) {
+    let Some(ziel) = app.editor.as_ref().filter(|e| !e.from_formula_bar).map(|e| e.cell) else {
+        app.einfach.summe_ziel = None;
+        return;
+    };
+    let Some(rect) = app.grid.geo.as_ref().and_then(|g| app.session.active().and_then(|d| d.wb.active()).map(|sh| g.cell_rect(sh, ziel))) else { return };
+    let t = Tokens::get(ctx);
+    let mut uebernehmen = false;
+    let mut verwerfen = false;
+    egui::Area::new(egui::Id::unique("simplegrid.summe_knoepfe"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(egui::pos2(rect.left(), rect.bottom() + 6.0))
+        .show(ctx, |ui| {
+            egui::Frame::NONE.fill(egui::Color32::WHITE).stroke(egui::Stroke::new(1.5, t.ribbon_border)).corner_radius(12.0).inner_margin(6.0).shadow(egui::epaint::Shadow { offset: [0, 3], blur: 10, spread: 0, color: egui::Color32::from_black_alpha(40) }).show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
+                    let gruen = egui::Color32::from_rgb(0x04, 0x78, 0x57);
+                    let rot = egui::Color32::from_rgb(0xB9, 0x1C, 0x1C);
+                    for (icon, farbe, tipp, ja) in [
+                        (crate::icons::Icon::Check, gruen, "Eingabe übernehmen (auch Enter)", true),
+                        (crate::icons::Icon::Close, rot, "Eingabe verwerfen (auch Esc)", false),
+                    ] {
+                        let (r, resp) = ui.allocate_exact_size(vec2(48.0, 48.0), egui::Sense::click());
+                        let fill = if ja { gruen } else { egui::Color32::WHITE };
+                        let fill = if resp.hovered() { fill.gamma_multiply(0.85) } else { fill };
+                        ui.painter().rect(r, 10.0, fill, egui::Stroke::new(3.0, farbe), egui::StrokeKind::Inside);
+                        crate::icons::paint(ui.painter(), r.shrink(10.0), icon, if ja { egui::Color32::WHITE } else { rot });
+                        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tipp));
+                        if resp.on_hover_text(tipp).clicked() {
+                            if ja {
+                                uebernehmen = true;
+                            } else {
+                                verwerfen = true;
+                            }
+                        }
+                    }
+                });
+            });
+        });
+    if uebernehmen {
+        app.einfach.summe_ziel = None;
+        app.commit_edit(0, 0, false, false);
+    } else if verwerfen {
+        app.einfach.summe_ziel = None;
+        app.cancel_edit();
     }
 }
 
@@ -1193,6 +1322,7 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
         app.einfach.sicherung.loeschen();
         ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
     }
+    eingabe_knoepfe(app, ctx);
     if std::mem::take(&mut app.einfach.update_laden) {
         #[cfg(not(target_arch = "wasm32"))]
         crate::updates_ui::herunterladen(app, ctx);
@@ -1365,7 +1495,9 @@ mod tests {
         let mut session = Session::new();
         deutsche_vorgaben(&mut session);
         session.new_workbook();
-        SheetApp::new(session, Services::default())
+        let mut a = SheetApp::new(session, Services::default());
+        a.ui.language = crate::i18n::Language::De;
+        a
     }
 
     fn blaetter(app: &SheetApp) -> Vec<String> {
@@ -1876,10 +2008,12 @@ mod tests {
         }
         a.run_or_alert("selection.set", json!({"range": "A1:A3"}));
         summe(&mut a);
+        assert!(a.commit_edit(0, 0, false, false));
         assert_eq!(formel(&mut a, "A4"), json!("=SUM(A1:A3)"));
         assert_eq!(wert(&mut a, "A4"), json!(6.0));
         a.run_or_alert("selection.set", json!({"range": "C1:D1"}));
         summe(&mut a);
+        assert!(a.commit_edit(0, 0, false, false));
         assert_eq!(wert(&mut a, "E1"), json!(9.0));
     }
 
@@ -1891,13 +2025,45 @@ mod tests {
         }
         a.run_or_alert("selection.set", json!({"cell": "B3"}));
         summe(&mut a);
+        assert!(a.commit_edit(0, 0, false, false));
         assert_eq!(formel(&mut a, "B5"), json!("=SUM(B2:B4)"));
         assert_eq!(wert(&mut a, "B5"), json!(60.5));
         a.run_or_alert("cell.set", json!({"cell": "D1", "input": "1"}));
         a.run_or_alert("cell.set", json!({"cell": "D2", "input": "2"}));
         a.run_or_alert("selection.set", json!({"cell": "D3"}));
         summe(&mut a);
+        assert!(a.commit_edit(0, 0, false, false));
         assert_eq!(wert(&mut a, "D3"), json!(3.0));
+    }
+
+    #[test]
+    fn summe_wird_zum_bestaetigen_vorgelegt_und_laesst_sich_verwerfen() {
+        let mut a = app();
+        for (c, v) in [("B1", "10"), ("B2", "20")] {
+            a.run_or_alert("cell.set", json!({"cell": c, "input": v}));
+        }
+        a.run_or_alert("selection.set", json!({"range": "B1:B2"}));
+        summe(&mut a);
+        let ed = a.editor.as_ref().map(|e| (e.cell.a1(), e.text.clone()));
+        assert_eq!(ed, Some(("B3".to_string(), "=SUMME(B1:B2)".to_string())), "Formel deutsch vorgelegt");
+        assert_eq!(wert(&mut a, "B3"), Json::Null, "noch nichts eingetragen");
+        assert_eq!(a.einfach.summe_ziel.map(|c| c.a1()).as_deref(), Some("B3"));
+        a.cancel_edit();
+        assert!(a.editor.is_none());
+        assert_eq!(wert(&mut a, "B3"), Json::Null, "rotes Kreuz / Esc: nichts eingetragen");
+    }
+
+    #[test]
+    fn summe_fuer_mehrere_spalten_rechnet_direkt() {
+        let mut a = app();
+        for (c, v) in [("A1", "1"), ("A2", "2"), ("B1", "3"), ("B2", "4")] {
+            a.run_or_alert("cell.set", json!({"cell": c, "input": v}));
+        }
+        a.run_or_alert("selection.set", json!({"range": "A1:B2"}));
+        summe(&mut a);
+        assert!(a.editor.is_none());
+        assert_eq!(wert(&mut a, "A3"), json!(3.0));
+        assert_eq!(wert(&mut a, "B3"), json!(7.0));
     }
 
     #[test]

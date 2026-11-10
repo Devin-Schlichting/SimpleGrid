@@ -22,6 +22,7 @@ fn main() {
     let mut dark = false;
     let mut seitenansicht = false;
     let mut register: Option<String> = None;
+    let mut summe = false;
     let mut frage: Option<String> = None;
     let mut pane: Option<String> = None;
     let mut chart: Option<u32> = None;
@@ -65,6 +66,7 @@ fn main() {
             // SimpleGrid: die Seitenansicht (Druckvorschau) zeigen.
             "--seitenansicht" => seitenansicht = true,
             // SimpleGrid: Register der Leiste (0–5) bzw. eine Rückfrage zeigen.
+            "--summe" => summe = true,
             "--register" => {
                 i += 1;
                 register = args.get(i).cloned();
@@ -151,6 +153,9 @@ fn main() {
                     && let Some(l) = simplegrid_ui_egui::i18n::Language::parse(code)
                 {
                     app.ui.language = l;
+                }
+                if summe {
+                    simplegrid_ui_egui::einfach::summe(&mut app);
                 }
                 if let Some(t) = tab {
                     app.ui.ribbon_tab = t;

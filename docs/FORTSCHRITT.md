@@ -165,3 +165,13 @@
 - Tests: 3104 grün. Entfernt: Tests von GridCraft's Statusleiste und alten Blattreitern sowie ein Grenzfall
   (400 pt hohes Fenster mit aufgeklappter Bearbeitungszeile).
 - Noch offen: Schrift „Inter“ ist nicht im Branding-Paket; bisher Systemschrift.
+
+## Nachbesserungen nach Phase 10 (2026-11-11)
+- Formeln: GridCraft's Funktionen bleiben alle nutzbar (eintippen); in die Leiste kommen vorerst keine weiteren.
+- Neu, Öffnen, Speichern, Speichern unter stehen jetzt in der Kopfzeile neben dem Dateinamen, links vom
+  Speicherstand (immer sichtbar); das Register „Start“ enthält nur noch Bearbeiten und Summe.
+- „Summe“ legt die Formel (`=SUMME(B2:B4)`) in der Zielzelle zum Bestätigen vor, der Bereich ist markiert.
+  Mehrere Spalten auf einmal rechnet sie weiter direkt aus.
+- Bei jeder Eingabe in eine Zelle erscheinen direkt darunter ein grüner Haken (übernehmen, wie Enter) und ein
+  rotes Kreuz (verwerfen, wie Esc) – ganz ohne Tastatur bedienbar.
+- Tests: 3106 grün.
