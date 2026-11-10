@@ -1,8 +1,8 @@
 //! Title bar (Quick Access Toolbar), ribbon tabs and ribbon groups, and keyboard shortcuts.
 
 use egui::{Align2, Color32, Key, Modifiers, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
-use simplegrid_engine::model::{HAlign, Style, VAlign};
 use serde_json::json;
+use simplegrid_engine::model::{HAlign, Style, VAlign};
 
 use crate::SheetApp;
 use crate::icons::{self, Icon};

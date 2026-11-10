@@ -4,10 +4,10 @@
 
 use egui::{Event, Key, Modifiers};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -40,9 +40,6 @@ fn save(h: &mut Harness, m: serde_json::Value) {
 fn dialog_name(h: &Harness) -> Option<String> {
     h.state().dialog.as_ref().map(|d| d.name().to_string())
 }
-
-
-
 
 #[test]
 fn the_macros_dialog_lists_scripts_and_the_vba_project_beside_macros() {
@@ -93,7 +90,6 @@ fn the_macros_dialog_lists_scripts_and_the_vba_project_beside_macros() {
     assert_eq!(h.state().session.active().unwrap().wb.macros.len(), 1);
 }
 
-
 #[test]
 fn a_shortcut_simplegrid_uses_does_not_run_a_macro() {
     let mut h = harness("Home");
@@ -121,7 +117,6 @@ fn a_macro_whose_output_lands_on_data_asks_and_can_shift_it_down() {
     assert_eq!(value(&h, "B2"), Value::Text("old".into()));
     assert_eq!(h.state().macros.recent, ["Put"]);
 }
-
 
 #[test]
 fn view_macros_record_macro_toggles_recording() {

@@ -1,10 +1,10 @@
 //! Language selection must affect UI entry, never the canonical engine/file boundary.
+use serde_json::json;
 use simplegrid_engine::{
     Session,
     core::{CellError, CellRef, Value},
 };
 use simplegrid_ui_egui::{SheetApp, UiState, i18n::Language};
-use serde_json::json;
 
 fn app() -> SheetApp {
     let mut session = Session::new();

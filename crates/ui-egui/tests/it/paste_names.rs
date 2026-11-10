@@ -3,11 +3,11 @@
 
 use egui::{Event, Key, vec2};
 use egui_kittest::kittest::Queryable;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::control::{Outcome, handle};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -46,8 +46,6 @@ fn press(h: &mut Harness, key: Key) {
     h.run_steps(3);
 }
 
-
-
 #[test]
 fn the_control_channel_confirms_the_dialog_like_ok() {
     let mut h = harness(true);
@@ -64,7 +62,6 @@ fn the_control_channel_confirms_the_dialog_like_ok() {
     assert_eq!(dialog(&h), None);
     assert_eq!(editor_text(&h).as_deref(), Some("=Sales"));
 }
-
 
 #[test]
 fn while_editing_the_name_goes_in_at_the_caret_and_the_edit_goes_on() {
@@ -108,4 +105,3 @@ fn cancel_leaves_the_selected_text_selected() {
     h.run_steps(2);
     assert_eq!(editor_text(&h).as_deref(), Some("=SUM(B2"), "typing replaces the text selected before the dialog opened");
 }
-

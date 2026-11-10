@@ -2,12 +2,12 @@
 //! is scrolled out of view and the active cell is inside it, as in Excel (#1423).
 
 use egui::{Event, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, RangeRef};
 use simplegrid_engine::model::Sheet;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::grid::{Geo, heading_table, table_headings};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

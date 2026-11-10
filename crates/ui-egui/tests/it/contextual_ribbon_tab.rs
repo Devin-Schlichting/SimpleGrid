@@ -2,9 +2,9 @@
 //! The tab remembered in the saved UI state, or left behind when the selection moves away, must
 //! not leave the ribbon blank: it falls back to Home.
 
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -28,9 +28,6 @@ fn app_restored_on(tab: &str, session: Session) -> Harness {
     crate::support::app_harness(app, 4)
 }
 
-
-
-
 #[test]
 fn startup_opens_on_home_not_the_saved_tab() {
     let saved = simplegrid_ui_egui::UiState { ribbon_tab: "Table Design".into(), dark: true, ..Default::default() };
@@ -50,4 +47,3 @@ fn an_ordinary_tab_stays_put_in_a_session() {
     h.run_steps(3);
     assert_eq!(h.state().ui.ribbon_tab, "Data");
 }
-

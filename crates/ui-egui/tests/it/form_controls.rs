@@ -5,12 +5,12 @@
 //! Controls buttons, context menu and dialogs.
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_engine::model::{FormControl, ObjKind, ObjRef};
 use simplegrid_ui_egui::form_controls::{Part, part_at, slider_parts};
 use simplegrid_ui_egui::{SheetApp, chartview, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -287,7 +287,6 @@ fn holding_enter_or_space_presses_a_focused_button_once() {
         assert_eq!(cell(&h, "A20"), Value::Empty, "{k:?} typed nothing into the cell");
     }
 }
-
 
 /// Space is a key a slider or spin button doesn't take, so it reaches the grid like any other
 /// character: a cell edit starts with a space and the control's value is unchanged. The control
@@ -580,7 +579,6 @@ fn controls(h: &Harness) -> Vec<FormControl> {
 fn cells_rect(h: &Harness) -> Rect {
     h.state().grid.cells_rect.unwrap()
 }
-
 
 #[test]
 fn assign_action_and_format_control_dialogs() {

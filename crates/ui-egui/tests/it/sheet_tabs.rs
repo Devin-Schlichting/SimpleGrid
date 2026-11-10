@@ -1,8 +1,8 @@
 //! Overflowing worksheet tabs, exercised through their actual painted geometry and input.
 use egui::{Event, Modifiers, PointerButton, Rect, Shape, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

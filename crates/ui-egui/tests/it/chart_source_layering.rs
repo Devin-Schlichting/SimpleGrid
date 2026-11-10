@@ -1,10 +1,10 @@
 //! #2861: a selected chart's source outline belongs behind floating objects, in cell space.
 
 use egui::{Color32, Rect, Shape, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::core::RangeRef;
 use simplegrid_engine::model::Anchor;
 use simplegrid_ui_egui::{SheetApp, theme::Tokens};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

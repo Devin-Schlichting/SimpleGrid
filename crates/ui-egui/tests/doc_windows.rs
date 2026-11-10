@@ -8,10 +8,10 @@
 use std::cell::RefCell;
 
 use egui::{Context, RawInput, ViewportCommand, ViewportEvent, ViewportId, ViewportInfo};
+use serde_json::json;
 use simplegrid_engine::{Session, core::CellRef, core::Value};
 use simplegrid_ui_egui::doc_windows::DocWindows;
 use simplegrid_ui_egui::{SaveAnswer, SheetApp};
-use serde_json::json;
 
 thread_local! {
     /// Each viewport's input for the next frame (focus, close button).
@@ -344,7 +344,11 @@ fn feedback_from_opening_a_workbook_shows_in_its_new_window() {
     let opened = desk.window_of(1);
     assert_eq!(desk.windows.shown_windows(), [book1, opened]);
     assert_eq!(desk.app.session.active_window(), Some(opened));
-    assert_eq!(desk.app.notice.as_ref().map(|n| n.kind), Some(simplegrid_ui_egui::NoticeKind::Warning), "the macro notice shows in the opened window");
+    assert_eq!(
+        desk.app.notice.as_ref().map(|n| n.kind),
+        Some(simplegrid_ui_egui::NoticeKind::Warning),
+        "the macro notice shows in the opened window"
+    );
     assert!(desk.app.message.is_some(), "and so does the alert");
     desk.app.enter_window(book1);
     assert!(desk.app.notice.is_none() && desk.app.message.is_none(), "Book1's window shows neither");

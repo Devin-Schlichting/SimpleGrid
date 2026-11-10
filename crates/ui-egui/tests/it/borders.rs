@@ -2,11 +2,11 @@
 
 use egui::{Color32, Shape, vec2};
 use egui_kittest::kittest::Queryable;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_engine::model::{BorderLine, BorderStyle, Borders, Color};
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 fn harness() -> egui_kittest::Harness<'static, SheetApp> {
     let mut session = Session::new();
@@ -29,7 +29,6 @@ fn borders(h: &egui_kittest::Harness<'static, SheetApp>, cell: &str) -> Borders 
     let sheet = doc.wb.active().unwrap();
     doc.wb.styles.get(sheet.style_id(CellRef::parse(cell).unwrap())).borders
 }
-
 
 fn colored_borders() -> Borders {
     let line = |color| BorderLine { style: BorderStyle::Thin, color: Color::Rgb(color) };

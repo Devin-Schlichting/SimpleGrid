@@ -4,10 +4,10 @@
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, os::OperatingSystem, vec2};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::{Value as Json, json};
 use simplegrid_engine::Session;
 use simplegrid_engine::model::{ObjKind, ObjRef, Shape, ShapeKind};
 use simplegrid_ui_egui::{SheetApp, chartview, grid::Geo};
-use serde_json::{Value as Json, json};
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -52,7 +52,6 @@ fn equations(h: &Harness) -> Vec<Shape> {
     h.state().session.doc().unwrap().wb.active().unwrap().shapes.iter().filter(|s| s.kind == ShapeKind::Equation).cloned().collect()
 }
 
-
 #[test]
 fn errors_show_their_position_and_block_ok() {
     let mut h = harness(blank());
@@ -86,7 +85,6 @@ fn quick_insert_buttons_insert_at_the_caret() {
     h.run_steps(3);
     assert_eq!(dialog_latex(&h).as_deref(), Some("y = \\frac{1\\pi }{}"));
 }
-
 
 #[test]
 fn double_click_edits_an_equation_in_one_undo_step() {
@@ -122,5 +120,3 @@ fn double_click_edits_an_equation_in_one_undo_step() {
     h.run_steps(2);
     assert_eq!(equations(&h)[0].text, "a^2 + b^2 = c^2");
 }
-
-

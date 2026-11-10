@@ -1,8 +1,8 @@
 //! Line breaks with Wrap Text off (#1604): Excel ignores them and draws the whole string on one line.
 
 use egui::Shape;
-use simplegrid_engine::Session;
 use serde_json::json;
+use simplegrid_engine::Session;
 
 type Harness = egui_kittest::Harness<'static, simplegrid_ui_egui::SheetApp>;
 

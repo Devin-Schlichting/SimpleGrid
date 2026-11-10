@@ -1,8 +1,8 @@
 //! Interface size preference (#230): a persistent zoom for the whole window, clamped.
 
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::{SheetApp, UiState};
-use serde_json::json;
 
 #[test]
 /// Interface size applies and persists, clamps to 75-200, accepts `auto`, and rejects missing or non-numeric values.

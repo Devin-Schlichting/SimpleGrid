@@ -1,10 +1,10 @@
 //! A formula started on one sheet and pointed at another sheet lands on the sheet it started on.
 
 use egui::vec2;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 /// Two sheets, `range` selected on the first, and `=1+2` typed there; then pointing moves to the second sheet.
 fn pointing_on_second_sheet(range: &str) -> egui_kittest::Harness<'static, SheetApp> {

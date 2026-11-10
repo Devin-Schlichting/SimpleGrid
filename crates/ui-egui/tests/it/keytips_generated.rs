@@ -51,20 +51,12 @@ fn sequence(h: &mut Harness, seq: &str, text_first: bool) {
     }
 }
 
-
 #[test]
 fn keytip_h_() {
     let mut h = harness(blank());
     sequence(&mut h, "H", false);
     assert_eq!(h.state().ui.ribbon_tab, "Home", "H must switch to the Home tab");
 }
-
-
-
-
-
-
-
 
 #[test]
 fn keytip_e_() {
@@ -80,36 +72,12 @@ fn keytip_o_() {
     assert_eq!(h.state().ui.ribbon_tab, "Home", "O must switch to the Home tab");
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[test]
 fn keytip_has_() {
     let mut h = harness(blank());
     sequence(&mut h, "HAS", false);
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "HAS must run home.addIns cleanly");
 }
-
-
-
-
-
 
 #[test]
 fn keytip_hbe_() {
@@ -121,8 +89,6 @@ fn keytip_hbe_() {
     assert!(h.state().session.journal.is_empty(), "HBE must not journal");
 }
 
-
-
 #[test]
 fn keytip_hbi_() {
     let mut h = harness(blank());
@@ -132,17 +98,6 @@ fn keytip_hbi_() {
     assert!(h.state().toast.is_none(), "HBI must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "HBI must not journal");
 }
-
-
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn keytip_hby_() {
@@ -154,16 +109,6 @@ fn keytip_hby_() {
     assert!(h.state().session.journal.is_empty(), "HBY must not journal");
 }
 
-
-
-
-
-
-
-
-
-
-
 #[test]
 fn keytip_hfc_() {
     let mut h = harness(blank());
@@ -171,10 +116,6 @@ fn keytip_hfc_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "HFC must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
-
-
 
 #[test]
 fn keytip_hfdo_() {
@@ -193,8 +134,6 @@ fn keytip_hfdp_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "HFDP must run arrange.selectionPane cleanly");
 }
 
-
-
 #[test]
 fn keytip_hff_() {
     let mut h = harness(blank());
@@ -202,8 +141,6 @@ fn keytip_hff_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "HFF must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
 
 #[test]
 fn keytip_hfia_() {
@@ -214,16 +151,6 @@ fn keytip_hfia_() {
     assert!(h.state().toast.is_none(), "HFIA must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "HFIA must not journal");
 }
-
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn keytip_hfq_() {
@@ -249,29 +176,6 @@ fn keytip_hh_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[test]
 fn keytip_hn_() {
     let mut h = harness(blank());
@@ -279,42 +183,6 @@ fn keytip_hn_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "HN must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn keytip_nc1_() {
@@ -324,9 +192,6 @@ fn keytip_nc1_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
-
-
 #[test]
 fn keytip_nd_() {
     let mut h = harness(blank());
@@ -335,12 +200,6 @@ fn keytip_nd_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
-
-
-
-
-
 #[test]
 fn keytip_nhi_() {
     let mut h = harness(blank());
@@ -348,8 +207,6 @@ fn keytip_nhi_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "NHI must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
 
 #[test]
 fn keytip_nj_() {
@@ -361,8 +218,6 @@ fn keytip_nj_() {
     assert!(h.state().session.journal.is_empty(), "NJ must not journal");
 }
 
-
-
 #[test]
 fn keytip_nn1_() {
     let mut h = harness(blank());
@@ -370,12 +225,6 @@ fn keytip_nn1_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "NN1 must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
-
-
-
-
 
 #[test]
 fn keytip_nq_() {
@@ -385,7 +234,6 @@ fn keytip_nq_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
 #[test]
 fn keytip_nsa_() {
     let mut h = harness(blank());
@@ -393,7 +241,6 @@ fn keytip_nsa_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "NSA must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
 
 #[test]
 fn keytip_nsc_() {
@@ -405,11 +252,6 @@ fn keytip_nsc_() {
     assert!(h.state().session.journal.is_empty(), "NSC must not journal");
 }
 
-
-
-
-
-
 #[test]
 fn keytip_nst_() {
     let mut h = harness(blank());
@@ -419,11 +261,6 @@ fn keytip_nst_() {
     assert!(h.state().toast.is_none(), "NST must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "NST must not journal");
 }
-
-
-
-
-
 
 #[test]
 fn keytip_nw_() {
@@ -435,38 +272,6 @@ fn keytip_nw_() {
     assert!(h.state().session.journal.is_empty(), "NW must not journal");
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[test]
 fn keytip_map_() {
     let mut h = harness(blank());
@@ -476,8 +281,6 @@ fn keytip_map_() {
     assert!(h.state().toast.is_none(), "MAP must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "MAP must not journal");
 }
-
-
 
 #[test]
 fn keytip_md_() {
@@ -494,7 +297,6 @@ fn keytip_me_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
 #[test]
 fn keytip_mg_() {
     let mut h = harness(blank());
@@ -502,8 +304,6 @@ fn keytip_mg_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "MG must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
 
 #[test]
 fn keytip_mi1_() {
@@ -513,9 +313,6 @@ fn keytip_mi1_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
-
-
 #[test]
 fn keytip_ml_() {
     let mut h = harness(blank());
@@ -523,8 +320,6 @@ fn keytip_ml_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "ML must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
 
 #[test]
 fn keytip_mo_() {
@@ -557,8 +352,6 @@ fn keytip_mr_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
-
 #[test]
 fn keytip_mt_() {
     let mut h = harness(blank());
@@ -567,9 +360,6 @@ fn keytip_mt_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
-
-
 #[test]
 fn keytip_muf_() {
     let mut h = harness(blank());
@@ -577,27 +367,12 @@ fn keytip_muf_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "MUF must run formulas.moreFunctions cleanly");
 }
 
-
-
-
-
 #[test]
 fn keytip_mw_() {
     let mut h = harness(blank());
     sequence(&mut h, "MW", false);
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "MW must run formulas.watchWindow cleanly");
 }
-
-
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn keytip_afa_() {
@@ -609,7 +384,6 @@ fn keytip_afa_() {
     assert!(h.state().session.journal.is_empty(), "AFA must not journal");
 }
 
-
 #[test]
 fn keytip_afe_() {
     let mut h = harness(blank());
@@ -619,7 +393,6 @@ fn keytip_afe_() {
     assert!(h.state().toast.is_none(), "AFE must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "AFE must not journal");
 }
-
 
 #[test]
 fn keytip_afo_() {
@@ -651,7 +424,6 @@ fn keytip_afw_() {
     assert!(h.state().session.journal.is_empty(), "AFW must not journal");
 }
 
-
 #[test]
 fn keytip_aga_() {
     let mut h = harness(blank());
@@ -662,9 +434,6 @@ fn keytip_aga_() {
     assert!(h.state().session.journal.is_empty(), "AGA must not journal");
 }
 
-
-
-
 #[test]
 fn keytip_ak_() {
     let mut h = harness(blank());
@@ -672,15 +441,12 @@ fn keytip_ak_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "AK must run data.queriesConnections cleanly");
 }
 
-
 #[test]
 fn keytip_ao_() {
     let mut h = harness(blank());
     sequence(&mut h, "AO", false);
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "AO must run data.queriesConnections cleanly");
 }
-
-
 
 #[test]
 fn keytip_apnd_() {
@@ -701,7 +467,6 @@ fn keytip_apne_() {
     assert!(h.state().toast.is_none(), "APNE must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "APNE must not journal");
 }
-
 
 #[test]
 fn keytip_apnh_() {
@@ -770,9 +535,6 @@ fn keytip_apt_() {
     assert!(h.state().session.journal.is_empty(), "APT must not journal");
 }
 
-
-
-
 #[test]
 fn keytip_arc_() {
     let mut h = harness(blank());
@@ -793,7 +555,6 @@ fn keytip_aro_() {
     assert!(h.state().session.journal.is_empty(), "ARO must not journal");
 }
 
-
 #[test]
 fn keytip_ars_() {
     let mut h = harness(blank());
@@ -803,11 +564,6 @@ fn keytip_ars_() {
     assert!(h.state().toast.is_none(), "ARS must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "ARS must not journal");
 }
-
-
-
-
-
 
 #[test]
 fn keytip_auc_() {
@@ -819,9 +575,6 @@ fn keytip_auc_() {
     assert!(h.state().session.journal.is_empty(), "AUC must not journal");
 }
 
-
-
-
 #[test]
 fn keytip_avr_() {
     let mut h = harness(blank());
@@ -832,16 +585,12 @@ fn keytip_avr_() {
     assert!(h.state().session.journal.is_empty(), "AVR must not journal");
 }
 
-
-
-
 #[test]
 fn keytip_aws_() {
     let mut h = harness(blank());
     sequence(&mut h, "AWS", false);
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "AWS must run data.scenarioManager cleanly");
 }
-
 
 #[test]
 fn keytip_ax_() {
@@ -853,16 +602,12 @@ fn keytip_ax_() {
     assert!(h.state().session.journal.is_empty(), "AX must not journal");
 }
 
-
-
 #[test]
 fn keytip_ra2_() {
     let mut h = harness(blank());
     sequence(&mut h, "RA2", false);
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "RA2 must run review.showComments cleanly");
 }
-
-
 
 #[test]
 fn keytip_rg_() {
@@ -884,10 +629,6 @@ fn keytip_rl_() {
     assert!(h.state().session.journal.is_empty(), "RL must not journal");
 }
 
-
-
-
-
 #[test]
 fn keytip_rrs_() {
     let mut h = harness(blank());
@@ -898,18 +639,6 @@ fn keytip_rrs_() {
     assert!(h.state().session.journal.is_empty(), "RRS must not journal");
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 #[test]
 fn keytip_wj_() {
     let mut h = harness(blank());
@@ -917,15 +646,6 @@ fn keytip_wj_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "WJ must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn keytip_wt_() {
@@ -936,7 +656,6 @@ fn keytip_wt_() {
     assert!(h.state().toast.is_none(), "WT must not raise a toast");
     assert!(h.state().session.journal.is_empty(), "WT must not journal");
 }
-
 
 #[test]
 fn keytip_wvc_() {
@@ -956,7 +675,6 @@ fn keytip_wvf_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
 #[test]
 fn keytip_wvn_() {
     let mut h = harness(blank());
@@ -967,7 +685,6 @@ fn keytip_wvn_() {
     assert!(h.state().session.journal.is_empty(), "WVN must not journal");
 }
 
-
 #[test]
 fn keytip_ww_() {
     let mut h = harness(blank());
@@ -976,25 +693,6 @@ fn keytip_ww_() {
     assert_eq!(h.state().keytips.prefix(), None);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[test]
 fn keytip_is_() {
     let mut h = harness(blank());
@@ -1002,39 +700,6 @@ fn keytip_is_() {
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "IS must route to its control without an error box");
     assert_eq!(h.state().keytips.prefix(), None);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[test]
 fn keytip_tud_() {
@@ -1049,7 +714,6 @@ fn keytip_tut_() {
     sequence(&mut h, "TUT", false);
     assert!(h.state().message.is_none() && h.state().toast.is_none(), "TUT must run formulas.tracePrecedents cleanly");
 }
-
 
 #[test]
 fn keytip_q_() {
@@ -1066,7 +730,6 @@ fn generated_test_count_matches_the_table() {
     const EXPECTED: usize = 413;
     assert_eq!(simplegrid_ui_egui::keytips::keytip_table::SEQUENCES.len(), EXPECTED);
 }
-
 
 fn reset(h: &mut Harness) {
     key(h, Key::Escape); // clear any prefix, back to the armed root

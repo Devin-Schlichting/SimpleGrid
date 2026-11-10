@@ -1,12 +1,12 @@
 //! The auto-growing formula bar, the 5-line in-cell editor and the code editor widget.
 
 use egui::{Event, Key, Modifiers, Rect, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::formula_bar::{BarLayout, MAX_LINES, one_line};
 use simplegrid_ui_egui::widgets::{Lang, code_editor};
 use simplegrid_ui_egui::{SheetApp, theme};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

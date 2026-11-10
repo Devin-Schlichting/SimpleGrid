@@ -2,10 +2,10 @@
 //! leaves Undo, Save and typing in unlocked cells working (#2945).
 
 use egui::{Event, Key, Modifiers};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

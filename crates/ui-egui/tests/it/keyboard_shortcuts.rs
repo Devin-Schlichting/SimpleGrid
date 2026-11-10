@@ -1,12 +1,12 @@
 //! Excel keyboard shortcuts (crate::keymap) dispatched through real egui key events.
 
 use egui::{Event, Key, Modifiers};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_engine::model::BorderStyle;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::keymap::{Shortcut, lookup};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -39,8 +39,6 @@ fn style(h: &Harness, a1: &str) -> simplegrid_engine::model::Style {
 /// Ctrl on Windows and Linux sets both `ctrl` and `command`.
 const CTRL: Modifiers = Modifiers { alt: false, ctrl: true, shift: false, mac_cmd: false, command: true };
 const CTRL_SHIFT: Modifiers = Modifiers { shift: true, ..CTRL };
-
-
 
 #[test]
 fn windows_and_mac_variants() {
@@ -75,7 +73,6 @@ fn windows_and_mac_variants() {
     assert_eq!(lookup(Key::F2, Some(Key::F2), Modifiers::NONE, false), None);
 }
 
-
 #[test]
 fn space_shortcuts_per_platform() {
     let run = |id: &'static str| Some(Shortcut::Run(id, json!({})));
@@ -88,9 +85,6 @@ fn space_shortcuts_per_platform() {
     // Cmd+Space is Spotlight on macOS.
     assert_eq!(space(mac_cmd, true), None);
 }
-
-
-
 
 /// #1443: Ctrl+Q (also with Shift or Alt, which is what AltGr+Q reports on Windows) must not
 /// close the window and lose unsaved input; macOS keeps Cmd+Q as the app's Quit.
@@ -152,7 +146,6 @@ fn alt_equals(h: &mut Harness) {
     h.input_mut().events.push(Event::Text("=".into()));
     h.run_steps(2);
 }
-
 
 #[test]
 fn ctrl_alt_letter_that_typed_text_is_not_select_all() {

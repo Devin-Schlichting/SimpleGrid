@@ -1,8 +1,8 @@
 //! In-place editing of a text box. The draft becomes one undoable engine command.
 
 use egui::{Color32, FontId, Key, Modifiers, Rect, TextEdit};
-use simplegrid_engine::{Mode, model::ShapeKind};
 use serde_json::json;
+use simplegrid_engine::{Mode, model::ShapeKind};
 
 use crate::{SheetApp, grid::Geo, theme};
 

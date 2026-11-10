@@ -115,14 +115,17 @@ fn load_prefs(app: &mut SheetApp) {
     }
     // SimpleGrid gibt es nur auf Deutsch.
     app.ui.language = simplegrid_ui_egui::i18n::Language::De;
-    // ...and its light or dark appearance (#239), until a theme is chosen and saved in ui.json.
-    app.ui.system_theme = true;
+    // SimpleGrid: immer helles Design mit hohem Kontrast (Phase 10), unabhängig von Windows.
+    app.ui.system_theme = false;
+    app.ui.dark = false;
     let Some(dir) = config_dir() else { return };
     if let Ok(b) = std::fs::read(dir.join("ui.json"))
         && let Ok(ui) = serde_json::from_slice::<simplegrid_ui_egui::UiState>(&b)
     {
         app.ui = ui.at_startup();
         app.ui.language = simplegrid_ui_egui::i18n::Language::De;
+        app.ui.system_theme = false;
+        app.ui.dark = false;
     }
     if let Ok(b) = std::fs::read(dir.join("prefs.json"))
         && let Ok(p) = serde_json::from_slice(&b)

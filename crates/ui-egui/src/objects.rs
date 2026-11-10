@@ -2,8 +2,8 @@
 //! equations and slicers). Painting and hit-testing live in `chartview`.
 
 use egui::{CursorIcon, Pos2, Rect, Vec2};
-use simplegrid_engine::model::{ObjKind, ObjRef, ShapeKind, Sheet};
 use serde_json::json;
+use simplegrid_engine::model::{ObjKind, ObjRef, ShapeKind, Sheet};
 
 use crate::SheetApp;
 

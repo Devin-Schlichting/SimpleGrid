@@ -1,11 +1,11 @@
 //! Drag cursors are asserted frame by frame through real egui pointer input (#936).
 
 use egui::{CursorIcon, Event, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, RangeRef, Value};
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::grid::{Drag, Geo, freeze_handles};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

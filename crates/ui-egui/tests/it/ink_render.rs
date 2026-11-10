@@ -2,9 +2,9 @@
 
 use egui::Shape;
 use egui::epaint::ColorMode;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 /// The colour of the ink stroke drawn from (40, 40) to (200, 40) sheet points, `width` points
 /// wide: the two-point horizontal path whose width is `width` at its own scale (160 pt long).

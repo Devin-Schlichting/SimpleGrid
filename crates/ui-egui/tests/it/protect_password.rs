@@ -2,8 +2,8 @@
 
 use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable as _;
-use simplegrid_ui_egui::SheetApp;
 use serde_json::json;
+use simplegrid_ui_egui::SheetApp;
 
 const SECRET: &str = "s3cret";
 

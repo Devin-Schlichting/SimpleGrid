@@ -147,3 +147,21 @@
   „Sie haben bereits die neueste Version (0.1.1).“
 - Beobachtet für Phase 10: SimpleGrid folgt dem dunklen Windows-Design; Meldungsfenster sind noch klein.
 - Die GitHub-Aktion warnt, dass `actions/checkout@v4` auf Node 20 läuft (nur Hinweis, kein Fehler).
+
+## Phase 10 – Design (2026-11-10)
+- Entwürfe als Design-Zeichenfläche (Artifact „SimpleGrid Design-Entwürfe“): drei Varianten der Hauptansicht,
+  Rückfrage, Seitenansicht. Gewählt: **Variante A – Register mit großen Knöpfen**.
+- Branding-Paket nach `branding/` entpackt (Symbol, Logos, Farben, Inter). Programm-Symbol (exe, Fenster,
+  Installer) aus der Master-Geometrie erzeugt: `installer/symbol_erzeugen.py`. Logo in der Kopfzeile gezeichnet.
+- Farben: Knöpfe/Text in dunklem Grün `#047857` (statt `#10B981`, das mit Weiß nur ~2,5:1 Kontrast hat),
+  Grau `#1F2937`/`#F3F4F6`; immer helles Design, unabhängig vom Windows-Design.
+- Neue Oberfläche (`einfach.rs`): Kopfzeile (Logo, Dateiname, „Alles gespeichert“/„Noch nicht gespeichert“),
+  6 Register (Start, Schrift und Farbe, Rahmen und Zellen, Zeilen und Spalten, Drucken, Hilfe), große Kacheln mit
+  GridCraft-Icons über der Beschriftung, Fußzeile mit Blättern (Doppelklick/„Umbenennen“ mit Eingabefenster),
+  „+ Blatt hinzufügen“, Löschen, ◀ ▶ und Zoom; waagerechte Bildlaufleiste darüber.
+- Rückfragen im neuen Stil: großer Titel, Hauptaktion grün, „Nicht speichern“/„Löschen“ rot umrandet, „Abbrechen“ grau.
+- Seitenansicht wie im Entwurf: links Schritte 1–3 (Lage, Farbe, Drucker) und „Jetzt drucken“, rechts die Seite.
+- In sehr niedrigen Fenstern (< 640 pt) entfallen Kopfzeile und Kachel-Symbole, damit die Tabelle sichtbar bleibt.
+- Tests: 3104 grün. Entfernt: Tests von GridCraft's Statusleiste und alten Blattreitern sowie ein Grenzfall
+  (400 pt hohes Fenster mit aufgeklappter Bearbeitungszeile).
+- Noch offen: Schrift „Inter“ ist nicht im Branding-Paket; bisher Systemschrift.

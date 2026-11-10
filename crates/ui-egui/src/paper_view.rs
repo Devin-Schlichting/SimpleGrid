@@ -10,11 +10,11 @@
 use std::sync::Arc;
 
 use egui::{Align2, Color32, FontId, Key, Painter, Pos2, Rect, Stroke, StrokeKind, TextEdit, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::cf::CfCache;
 use simplegrid_engine::cmd::print::{self, HfContext};
 use simplegrid_engine::model::{HfPage, Sheet, SheetViewMode, Workbook};
 use simplegrid_engine::paper::{self, HfZone, PageGrid};
-use serde_json::json;
 
 use crate::SheetApp;
 use crate::grid::{self, DISPLAY_SCALE, Geo};

@@ -3,10 +3,10 @@
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::kittest::Queryable;
+use serde_json::{Value as Json, json};
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::control::{Outcome, handle};
-use serde_json::{Value as Json, json};
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

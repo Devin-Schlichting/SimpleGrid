@@ -1,8 +1,8 @@
 //! Page Setup opens on the active sheet's saved margins, so OK without edits keeps them (issue #524).
 
+use serde_json::{Value, json};
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::{Value, json};
 
 fn margins(app: &SheetApp) -> [f32; 6] {
     app.session.active().and_then(|d| d.wb.active()).map(|s| s.print.margins).unwrap_or_default()

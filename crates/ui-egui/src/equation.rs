@@ -9,9 +9,9 @@ use std::sync::Arc;
 use egui::epaint::{Mesh, PathShape, PathStroke};
 use egui::text::{CCursor, CCursorRange};
 use egui::{Color32, FontFamily, FontId, Key, Painter, Pos2, Rect, Stroke, StrokeKind, TextEdit, pos2, vec2};
+use serde_json::{Value as Json, json};
 use simplegrid_engine::math::{Face, Item, MathError, MathList, PathCmd};
 use simplegrid_engine::model::{Shape, ShapeKind, Workbook};
-use serde_json::{Value as Json, json};
 
 use crate::SheetApp;
 use crate::code_editor::{Lang, code_editor_marked};

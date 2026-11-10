@@ -180,9 +180,6 @@ fn filter_menu_uses_the_table_whose_header_was_clicked() {
     assert_eq!(filter_table_range(&sh, 1, 4), None);
 }
 
-
-
-
 #[test]
 fn galley_baseline_bounds_preserves_empty_edge_rows() {
     let ctx = egui::Context::default();

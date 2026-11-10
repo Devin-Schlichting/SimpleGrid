@@ -2,10 +2,10 @@
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -72,7 +72,6 @@ fn typing_into_a_covered_cell_remains_visible_after_clicking_away() {
     click_cell(&mut h, "B2");
     assert!(h.query_by_label("hello").is_some(), "the formula bar must show the merged content when a covered cell is selected");
 }
-
 
 #[test]
 fn formula_bar_reads_and_edits_the_merge_anchor_from_a_covered_cell() {

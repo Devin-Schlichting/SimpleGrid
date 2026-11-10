@@ -51,7 +51,10 @@ pub fn seiten(app: &mut SheetApp, sa: &mut Seitenansicht) -> Vec<Json> {
 }
 
 fn knopf(ui: &mut Ui, text: &str, tipp: &str, an: bool, aus: Option<&str>) -> bool {
-    let b = egui::Button::new(RichText::new(text).font(theme::ui_font(masse::SCHRIFT))).selected(an).min_size(vec2(masse::KNOPF_BREITE, masse::KNOPF_HOEHE));
+    let b = egui::Button::new(RichText::new(text).font(theme::ui_bold(masse::SCHRIFT)))
+        .selected(an)
+        .corner_radius(10.0)
+        .min_size(vec2(masse::KNOPF_BREITE, masse::KNOPF_HOEHE));
     let r = ui.add_enabled(aus.is_none(), b);
     let r = match aus {
         Some(g) => r.on_disabled_hover_text(format!("{tipp}\n\n{g}")),
@@ -72,77 +75,131 @@ pub fn zeigen(app: &mut SheetApp, ui: &mut Ui) {
         .and_then(|d| d.wb.active())
         .map(|sh| (sh.print.orientation != simplegrid_engine::model::Orientation::Landscape, sh.print.fit_to == Some((1, 1))))
         .unwrap_or((true, false));
-    egui::Panel::top("simplegrid_seitenansicht_leiste").resizable(false).frame(egui::Frame::NONE.fill(t.window).inner_margin(egui::Margin::same(8))).show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing = vec2(masse::ABSTAND, 8.0);
-            if knopf(ui, "◀ Zurück zur Tabelle", "Die Seitenansicht schließen", false, None) {
-                schliessen = true;
-            }
-            ui.separator();
-            let nichts = seiten.is_empty().then_some("Auf diesem Blatt steht nichts zum Drucken.");
-            let kein_drucker = (app.services.print_native.is_some() && !app.printing.ready()).then_some("Bitte rechts zuerst einen Drucker wählen.");
-            if knopf(ui, "🖨 Drucken", "Auf dem Drucker ausgeben, so wie hier gezeigt", false, nichts.or(kein_drucker)) {
-                app.print_now(druck_parameter(sa.schwarz_weiss));
-            }
-            if knopf(ui, "Als PDF speichern", "Eine PDF-Datei speichern (zum Ansehen oder Verschicken)", false, nichts) {
-                app.export_pdf_with_picker(druck_parameter(sa.schwarz_weiss));
-            }
-            ui.separator();
-            if knopf(ui, "Hochformat", "Das Blatt hochkant drucken", hochformat, None) && !hochformat {
-                app.run_or_alert("pageLayout.orientation", json!({"orientation": "portrait"}));
-            }
-            if knopf(ui, "Querformat", "Das Blatt quer drucken", !hochformat, None) && hochformat {
-                app.run_or_alert("pageLayout.orientation", json!({"orientation": "landscape"}));
-            }
-            if knopf(ui, "Auf eine Seite", "Alles verkleinert auf eine einzige Seite drucken (noch einmal klicken: normale Größe)", eine_seite, None) {
-                auf_eine_seite(app, !eine_seite);
-            }
-            ui.separator();
-            if knopf(ui, "Farbe", "In Farbe drucken", !sa.schwarz_weiss, None) {
-                sa.schwarz_weiss = false;
-            }
-            if knopf(ui, "Schwarz-Weiß", "Ohne Farbe drucken: Hintergründe werden hellgrau, Schrift und Linien schwarz", sa.schwarz_weiss, None) {
-                sa.schwarz_weiss = true;
-            }
+    // Kopf: zurück zur Tabelle und Überschrift.
+    egui::Panel::top("simplegrid_seitenansicht_kopf")
+        .resizable(false)
+        .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(20, 10)).stroke(egui::Stroke::new(1.0, t.ribbon_border)))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                if knopf(ui, "◀ Zurück zur Tabelle", "Die Seitenansicht schließen", false, None) {
+                    schliessen = true;
+                }
+                ui.add_space(12.0);
+                ui.label(RichText::new("Seitenansicht – so wird gedruckt").font(theme::ui_bold(26.0)).color(t.text));
+            });
         });
-    });
-    // Druckerwahl (GridCraft): ohne gewählten Drucker kann nicht gedruckt werden.
+    // Links: die Einstellungen als Schritte, darunter „Jetzt drucken“.
     let lang = app.ui.language;
-    if let Some(suche) = &app.services.printers {
-        egui::Panel::right("simplegrid_seitenansicht_drucker").resizable(false).exact_size(300.0).frame(egui::Frame::NONE.fill(t.window).inner_margin(egui::Margin::same(12))).show(ui, |ui| {
-            ui.label(RichText::new("Drucker").font(theme::ui_bold(masse::SCHRIFT)));
-            ui.add_space(6.0);
-            crate::printing::show(&mut app.printing, ui, suche, |label| lang.tr(label).to_owned());
+    egui::Panel::left("simplegrid_seitenansicht_schritte")
+        .resizable(false)
+        .exact_size(380.0)
+        .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::same(22)).stroke(egui::Stroke::new(1.0, t.ribbon_border)))
+        .show(ui, |ui| {
+            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                ui.spacing_mut().item_spacing = vec2(10.0, 10.0);
+                let schritt = |ui: &mut Ui, text: &str| {
+                    ui.add_space(6.0);
+                    ui.label(RichText::new(text).font(theme::ui_bold(18.0)).color(t.text));
+                };
+                let breit = |ui: &mut Ui, text: &str, tipp: &str, an: bool| -> bool {
+                    let b = egui::Button::new(RichText::new(text).font(if an { theme::ui_bold(19.0) } else { theme::ui_font(19.0) }).color(if an {
+                        t.accent_dark
+                    } else {
+                        t.text
+                    }))
+                    .fill(if an { t.accent_soft } else { egui::Color32::WHITE })
+                    .stroke(egui::Stroke::new(if an { 3.0 } else { 2.0 }, if an { t.accent } else { t.ribbon_border }))
+                    .corner_radius(12.0)
+                    .min_size(vec2(160.0, 62.0));
+                    ui.add(b).on_hover_text(tipp).clicked()
+                };
+                schritt(ui, "1. Wie soll das Blatt liegen?");
+                ui.horizontal(|ui| {
+                    if breit(ui, "Hochformat", "Das Blatt hochkant drucken", hochformat) && !hochformat {
+                        app.run_or_alert("pageLayout.orientation", json!({"orientation": "portrait"}));
+                    }
+                    if breit(ui, "Querformat", "Das Blatt quer drucken", !hochformat) && hochformat {
+                        app.run_or_alert("pageLayout.orientation", json!({"orientation": "landscape"}));
+                    }
+                });
+                if breit(
+                    ui,
+                    "Alles auf eine Seite",
+                    "Alles verkleinert auf eine einzige Seite drucken (noch einmal klicken: normale Größe)",
+                    eine_seite,
+                ) {
+                    auf_eine_seite(app, !eine_seite);
+                }
+                schritt(ui, "2. In Farbe?");
+                ui.horizontal(|ui| {
+                    if breit(ui, "Farbe", "In Farbe drucken", !sa.schwarz_weiss) {
+                        sa.schwarz_weiss = false;
+                    }
+                    if breit(ui, "Schwarz-Weiß", "Ohne Farbe drucken: Hintergründe werden hellgrau, Schrift und Linien schwarz", sa.schwarz_weiss) {
+                        sa.schwarz_weiss = true;
+                    }
+                });
+                if let Some(suche) = &app.services.printers {
+                    schritt(ui, "3. Drucker");
+                    crate::printing::show(&mut app.printing, ui, suche, |label| lang.tr(label).to_owned());
+                }
+                ui.add_space(18.0);
+                let nichts = seiten.is_empty().then_some("Auf diesem Blatt steht nichts zum Drucken.");
+                let kein_drucker = (app.services.print_native.is_some() && !app.printing.ready()).then_some("Bitte zuerst einen Drucker wählen.");
+                let aus = nichts.or(kein_drucker);
+                let drucken = egui::Button::new(RichText::new("Jetzt drucken").font(theme::ui_bold(24.0)).color(egui::Color32::WHITE))
+                    .fill(if aus.is_some() { t.text_disabled } else { t.accent })
+                    .stroke(egui::Stroke::new(3.0, if aus.is_some() { t.text_disabled } else { t.accent }))
+                    .corner_radius(14.0)
+                    .min_size(vec2(330.0, 80.0));
+                let r = ui.add_enabled(aus.is_none(), drucken);
+                let r = match aus {
+                    Some(g) => r.on_disabled_hover_text(g),
+                    None => r.on_hover_text("Auf dem Drucker ausgeben, so wie rechts gezeigt"),
+                };
+                if r.clicked() {
+                    app.print_now(druck_parameter(sa.schwarz_weiss));
+                }
+                if knopf(ui, "Als PDF speichern", "Eine PDF-Datei speichern (zum Ansehen oder Verschicken)", false, nichts) {
+                    app.export_pdf_with_picker(druck_parameter(sa.schwarz_weiss));
+                }
+            });
         });
-    }
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.desk)).show(ui, |ui| {
         if seiten.is_empty() {
-            ui.centered_and_justified(|ui| ui.label(RichText::new("Auf diesem Blatt steht nichts zum Drucken.").font(theme::ui_font(masse::SCHRIFT + 4.0))));
+            ui.centered_and_justified(|ui| {
+                ui.label(RichText::new("Auf diesem Blatt steht nichts zum Drucken.").font(theme::ui_font(masse::SCHRIFT + 4.0)))
+            });
             return;
         }
         let letzte = seiten.len() - 1;
         sa.seite = sa.seite.min(letzte);
         // Untere Leiste: Blättern und Zoom.
-        egui::Panel::bottom("simplegrid_seitenansicht_blaettern").resizable(false).frame(egui::Frame::NONE.fill(t.window).inner_margin(egui::Margin::same(8))).show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = masse::ABSTAND;
-                if knopf(ui, "◀ Vorige Seite", "Eine Seite zurückblättern", false, (sa.seite == 0).then_some("Das ist die erste Seite.")) {
-                    sa.seite -= 1;
-                }
-                ui.label(RichText::new(format!("Seite {} von {}", sa.seite + 1, seiten.len())).font(theme::ui_bold(masse::SCHRIFT)));
-                if knopf(ui, "Nächste Seite ▶", "Eine Seite weiterblättern", false, (sa.seite >= letzte).then_some("Das ist die letzte Seite.")) {
-                    sa.seite += 1;
-                }
-                ui.separator();
-                if knopf(ui, "− Kleiner", "Die Vorschau kleiner zeigen", false, (sa.zoom <= 1.0).then_some("Die ganze Seite ist schon zu sehen.")) {
-                    sa.zoom = (sa.zoom - 0.5).max(1.0);
-                }
-                ui.label(RichText::new(format!("{} %", (sa.zoom * 100.0).round())).font(theme::ui_bold(masse::SCHRIFT)));
-                if knopf(ui, "+ Größer", "Die Vorschau vergrößern", false, (sa.zoom >= 3.0).then_some("Größer geht es nicht.")) {
-                    sa.zoom = (sa.zoom + 0.5).min(3.0);
-                }
+        egui::Panel::bottom("simplegrid_seitenansicht_blaettern")
+            .resizable(false)
+            .frame(egui::Frame::NONE.fill(t.window).inner_margin(egui::Margin::same(8)))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = masse::ABSTAND;
+                    if knopf(ui, "◀ Vorige Seite", "Eine Seite zurückblättern", false, (sa.seite == 0).then_some("Das ist die erste Seite.")) {
+                        sa.seite -= 1;
+                    }
+                    ui.label(RichText::new(format!("Seite {} von {}", sa.seite + 1, seiten.len())).font(theme::ui_bold(masse::SCHRIFT)));
+                    if knopf(ui, "Nächste Seite ▶", "Eine Seite weiterblättern", false, (sa.seite >= letzte).then_some("Das ist die letzte Seite."))
+                    {
+                        sa.seite += 1;
+                    }
+                    ui.separator();
+                    if knopf(ui, "– Kleiner", "Die Vorschau kleiner zeigen", false, (sa.zoom <= 1.0).then_some("Die ganze Seite ist schon zu sehen."))
+                    {
+                        sa.zoom = (sa.zoom - 0.5).max(1.0);
+                    }
+                    ui.label(RichText::new(format!("{} %", (sa.zoom * 100.0).round())).font(theme::ui_bold(masse::SCHRIFT)));
+                    if knopf(ui, "+ Größer", "Die Vorschau vergrößern", false, (sa.zoom >= 3.0).then_some("Größer geht es nicht.")) {
+                        sa.zoom = (sa.zoom + 0.5).min(3.0);
+                    }
+                });
             });
-        });
         let Some(page) = seiten.get(sa.seite) else { return };
         let w = page.get("width").and_then(Json::as_f64).filter(|w| w.is_finite() && *w > 1.0).unwrap_or(595.0) as f32;
         let h = page.get("height").and_then(Json::as_f64).filter(|h| h.is_finite() && *h > 1.0).unwrap_or(842.0) as f32;
@@ -161,7 +218,13 @@ pub fn zeigen(app: &mut SheetApp, ui: &mut Ui) {
                 }
                 // Seitenzahl unten in der Mitte, wie sie gedruckt wird.
                 let fuss = egui::pos2(rect.center().x, rect.bottom() - 0.45 * 72.0 * rect.width() / w);
-                p.text(fuss, egui::Align2::CENTER_CENTER, format!("Seite {} von {}", sa.seite + 1, seiten.len()), theme::ui_font((10.0 * rect.width() / w).clamp(4.0, 30.0)), egui::Color32::BLACK);
+                p.text(
+                    fuss,
+                    egui::Align2::CENTER_CENTER,
+                    format!("Seite {} von {}", sa.seite + 1, seiten.len()),
+                    theme::ui_font((10.0 * rect.width() / w).clamp(4.0, 30.0)),
+                    egui::Color32::BLACK,
+                );
             });
             ui.add_space(20.0);
         });
@@ -288,10 +351,11 @@ mod tests {
         a.run_or_alert("home.fillColor", json!({"range": "A1", "color": "#FF0000"}));
         let farbe = a.session.run("file.print", druck_parameter(false)).unwrap_or_default();
         let sw = a.session.run("file.print", druck_parameter(true)).unwrap_or_default();
-        let text = |v: &Json| v["base64"].as_str().and_then(simplegrid_engine::io::base64_decode).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+        let text = |v: &Json| {
+            v["base64"].as_str().and_then(simplegrid_engine::io::base64_decode).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default()
+        };
         assert!(text(&farbe).contains("1 0 0 rg"), "rote Fläche in Farbe");
         assert!(!text(&sw).contains("1 0 0 rg"), "keine rote Fläche in Schwarz-Weiß");
         assert!(text(&sw).contains("Seite"), "Seitenzahl im Druck");
     }
 }
-

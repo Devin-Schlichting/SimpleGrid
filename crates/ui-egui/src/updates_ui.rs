@@ -44,9 +44,8 @@ fn quelle(app: &SheetApp) -> GithubQuelle {
 pub(crate) fn tick(app: &mut SheetApp, ctx: &egui::Context) {
     let heute = chrono::Local::now().format("%Y-%m-%d").to_string();
     let manual = std::mem::take(&mut app.updates_rt.manual);
-    let automatisch = std::mem::take(&mut app.updates_rt.startup)
-        && app.ui.update_automatisch
-        && !update::heute_schon_geprueft(&app.ui.update_zuletzt, &heute);
+    let automatisch =
+        std::mem::take(&mut app.updates_rt.startup) && app.ui.update_automatisch && !update::heute_schon_geprueft(&app.ui.update_zuletzt, &heute);
     if (manual || automatisch) && app.updates_rt.pruefung.is_none() {
         app.ui.update_zuletzt = heute;
         let q = quelle(app);

@@ -2,9 +2,9 @@
 
 use egui::{Theme, ThemePreference};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::{Value, json};
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::{SheetApp, UiState, control, theme::Tokens};
-use serde_json::{Value, json};
 
 fn harness(ui: UiState) -> egui_kittest::Harness<'static, SheetApp> {
     let mut session = Session::new();
@@ -103,7 +103,6 @@ fn system_tracks_live_os_changes_with_both_simplegrid_palettes_and_light_fallbac
     }
 }
 
-
 #[test]
 fn invalid_mode_preserves_preferences_and_legacy_overrides_leave_system_mode() {
     let mut h = harness(UiState::default());
@@ -141,4 +140,3 @@ fn invalid_mode_preserves_preferences_and_legacy_overrides_leave_system_mode() {
     system_theme(&mut h, Some(Theme::Dark));
     assert_appearance(&h, false);
 }
-

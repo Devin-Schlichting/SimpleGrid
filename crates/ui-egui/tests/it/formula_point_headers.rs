@@ -2,9 +2,9 @@
 //! whole-column or whole-row reference, driven through real egui pointer events.
 
 use egui::{Event, Modifiers, PointerButton, Pos2, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 fn harness() -> egui_kittest::Harness<'static, SheetApp> {
     let mut session = Session::new();

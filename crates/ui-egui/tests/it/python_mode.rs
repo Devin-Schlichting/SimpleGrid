@@ -3,9 +3,9 @@
 
 use egui::{Event, Key, Modifiers, vec2};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellError, CellRef, Value};
-use serde_json::json;
 
 use crate::common::Harness;
 
@@ -70,8 +70,6 @@ fn value(h: &Harness, cell: &str) -> Value {
     d.wb.active().unwrap().value(CellRef::parse(cell).unwrap())
 }
 
-
-
 #[test]
 fn typing_py_then_tab_enters_python_mode_as_in_excel() {
     let mut h = harness(blank());
@@ -113,11 +111,6 @@ fn a_draft_typed_inside_a_spill_does_not_enter_python_mode() {
     ctrl_enter(&mut h);
     assert_eq!(code(&h, "A2"), None, "no code is written into the spill");
 }
-
-
-
-
-
 
 #[test]
 fn ui_python_mode_switches_from_the_control_channel_without_a_dialog() {
@@ -174,8 +167,3 @@ fn click_cell(h: &mut Harness, a1: &str) {
     }
     h.run_steps(2);
 }
-
-
-
-
-

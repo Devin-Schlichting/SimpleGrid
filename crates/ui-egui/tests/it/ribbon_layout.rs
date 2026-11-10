@@ -26,10 +26,6 @@ fn app_at(width: f32, tab: &str) -> Harness {
     h
 }
 
-
-
-
-
 #[derive(Default)]
 struct Clicks {
     main: u32,
@@ -70,4 +66,3 @@ fn big_split_button_separates_the_default_action_from_the_menu() {
     assert!(main.max.y <= arrow.min.y + 0.5);
     assert!((main.min.x - arrow.min.x).abs() < 0.5 && (main.max.x - arrow.max.x).abs() < 0.5);
 }
-

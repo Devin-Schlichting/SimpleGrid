@@ -6,10 +6,10 @@ use std::rc::Rc;
 use egui::accesskit::Role;
 use egui::{Event, Modifiers, OutputCommand, PointerButton};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::{Services, SheetApp, grid};
-use serde_json::json;
 
 fn harness(services: Services) -> egui_kittest::Harness<'static, SheetApp> {
     let mut session = Session::new();
@@ -120,8 +120,6 @@ fn copying_multiple_areas_copies_lined_up_areas_and_explains_the_rest() {
     assert_eq!(h.state().session.clipboard.as_ref().map(|c| c.areas.len()), Some(2), "the earlier copy stays");
 }
 
-
-
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
 fn value_at(h: &Harness, a1: &str) -> Option<Value> {
@@ -144,8 +142,6 @@ fn system_clipboard(text: &str) -> (Rc<RefCell<(String, usize)>>, Services) {
     (clipboard, services)
 }
 
-
-
 fn press(h: &mut Harness, key: egui::Key) {
     for pressed in [true, false] {
         h.input_mut().events.push(Event::Key { key, physical_key: None, pressed, repeat: false, modifiers: Modifiers::NONE });
@@ -155,8 +151,6 @@ fn press(h: &mut Harness, key: egui::Key) {
     }
     h.run_steps(2);
 }
-
-
 
 fn has_formula(h: &Harness, a1: &str) -> bool {
     let at = CellRef::parse(a1).unwrap();
@@ -174,9 +168,6 @@ fn click_paste(h: &mut Harness) {
     h.get_by_role_and_label(Role::Button, "Paste").click();
     h.run_steps(2);
 }
-
-
-
 
 #[test]
 fn cmd_v_after_a_pasted_cut_does_not_paste_the_cut_text_again() {
@@ -250,7 +241,3 @@ fn pictures(h: &Harness) -> Vec<(String, f32, f32, String)> {
     let sh = h.state().session.active().unwrap().wb.active().unwrap();
     sh.images.iter().map(|i| (i.anchor.cell.a1(), i.anchor.width, i.anchor.height, i.mime.clone())).collect()
 }
-
-
-
-

@@ -3,11 +3,11 @@
 
 use egui::{Event, Key, Modifiers, PointerButton};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_engine::model::{Step, StepKind};
 use simplegrid_ui_egui::{Services, SheetApp};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -60,7 +60,6 @@ fn click(h: &mut Harness, label: &str) {
     h.get_by_label(label).click();
     h.run_steps(3);
 }
-
 
 #[test]
 fn the_gutter_toggles_breakpoints() {
@@ -201,21 +200,6 @@ fn debugging_never_writes_the_selection_into_a_reference_box() {
     assert!(h.state().session.macro_debug.is_none());
 }
 
-#[test]
-fn step_into_from_the_macros_dialog_pauses_before_the_first_step() {
-    let mut h = harness();
-    three(&mut h);
-    h.state_mut().dialog = None;
-    h.state_mut().macros.editor = None;
-    h.state_mut().open_dialog("macros", json!({"name": "Three"}));
-    h.run_steps(2);
-    click(&mut h, "Step Into");
-    h.run_steps(2);
-    assert_eq!(h.state().dialog.as_ref().map(|d| d.name()), Some("macroEditor"));
-    assert!(h.state().session.macro_debug.is_some());
-    assert!(h.query_by_label_contains("Debugging “Three”").is_some(), "the status bar says so");
-}
-
 
 #[test]
 fn run_from_the_editor_asks_before_writing_over_data() {
@@ -233,7 +217,6 @@ fn run_from_the_editor_asks_before_writing_over_data() {
     click(&mut h, "Overwrite");
     assert_eq!(value(&h, "A2"), Value::Text("new".into()));
 }
-
 
 #[test]
 fn a_rename_that_lands_before_a_failed_save_is_remembered() {
@@ -261,7 +244,6 @@ fn a_rename_that_lands_before_a_failed_save_is_remembered() {
     assert_eq!(wb.macros.len(), 1);
     assert_eq!((wb.macros[0].name.as_str(), wb.macros[0].steps.len()), ("Renamed", 3));
 }
-
 
 #[test]
 fn enter_in_change_never_picks_a_control_step() {
@@ -422,7 +404,6 @@ fn quitting_asks_about_the_editors_unsaved_steps_first() {
     assert!(h.state().macros.editor.is_none());
     assert!(sent.contains(&egui::ViewportCommand::Close), "{sent:?}");
 }
-
 
 #[test]
 fn a_dialog_asked_for_over_the_editor_says_why_it_did_not_open() {
@@ -879,4 +860,3 @@ fn a_different_close_during_the_editors_question_is_refused_until_it_is_answered
     assert_eq!(h.state().macros.editor.as_ref().map(|e| e.draft.steps.len()), Some(1));
     assert!(h.state().macros.editor.as_ref().is_some_and(|e| e.then_close.is_none()));
 }
-

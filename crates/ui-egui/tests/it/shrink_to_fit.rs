@@ -1,10 +1,10 @@
 //! Shrink to fit (#375): too-wide content is drawn in a smaller font inside its cell.
 
 use egui::Shape;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

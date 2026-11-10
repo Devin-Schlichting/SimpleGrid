@@ -14,15 +14,20 @@ use crate::theme::{self, Tokens};
 /// Zentrale Maße der einfachen Oberfläche. Eine Änderung hier wirkt auf alle Schaltflächen.
 pub mod masse {
     /// Mindesthöhe einer Schaltfläche in Punkten.
-    pub const KNOPF_HOEHE: f32 = 44.0;
+    pub const KNOPF_HOEHE: f32 = 52.0;
     /// Mindestbreite einer Schaltfläche in Punkten.
     pub const KNOPF_BREITE: f32 = 84.0;
     /// Schriftgröße der Beschriftungen.
-    pub const SCHRIFT: f32 = 16.0;
+    pub const SCHRIFT: f32 = 17.0;
     /// Schriftgröße der Gruppenüberschriften.
     pub const GRUPPEN_SCHRIFT: f32 = 12.5;
     /// Abstand zwischen zwei Schaltflächen.
-    pub const ABSTAND: f32 = 6.0;
+    pub const ABSTAND: f32 = 8.0;
+    /// Kacheln (Symbol über Beschriftung) in den Registern.
+    pub const KACHEL_BREITE: f32 = 92.0;
+    pub const KACHEL_HOEHE: f32 = 88.0;
+    /// Größe der Symbole auf den Kacheln.
+    pub const SYMBOL: f32 = 30.0;
 }
 
 /// Zentrale Texte der einfachen Oberfläche, in einfachen Alltagswörtern.
@@ -35,11 +40,13 @@ pub mod texte {
     pub const UNGESPEICHERT_TITEL: &str = "Änderungen speichern?";
     pub const UNGESPEICHERT_TEXT: &str = "Die Tabelle „{}“ hat Änderungen, die noch nicht gespeichert sind. Möchten Sie sie vorher speichern?";
     pub const BLATT_LOESCHEN_TITEL: &str = "Blatt löschen?";
-    pub const BLATT_LOESCHEN_TEXT: &str = "Soll das Blatt „{}“ mit allem, was darauf steht, gelöscht werden? Mit „Rückgängig“ können Sie es zurückholen.";
+    pub const BLATT_LOESCHEN_TEXT: &str =
+        "Soll das Blatt „{}“ mit allem, was darauf steht, gelöscht werden? Mit „Rückgängig“ können Sie es zurückholen.";
     pub const LETZTES_BLATT: &str = "Das letzte Blatt kann nicht gelöscht werden.";
     pub const HINWEIS_TITEL: &str = "Hinweis";
     pub const OEFFNEN_TITEL: &str = "Datei lässt sich nicht öffnen";
-    pub const OEFFNEN_FEHLER: &str = "Die Datei „{}“ konnte nicht geöffnet werden. Vielleicht ist sie beschädigt, oder es ist keine Tabelle im Format .xlsx oder .ods.";
+    pub const OEFFNEN_FEHLER: &str =
+        "Die Datei „{}“ konnte nicht geöffnet werden. Vielleicht ist sie beschädigt, oder es ist keine Tabelle im Format .xlsx oder .ods.";
     pub const IMPORT_HINWEIS: &str = "Nicht alles aus dieser Datei kann angezeigt werden (zum Beispiel Diagramme, Bilder oder Filter). Was SimpleGrid nicht kennt, wurde weggelassen.";
 }
 
@@ -69,6 +76,8 @@ pub enum Frage {
     Wiederherstellen { titel: String, zeit: String },
     /// Eine neue Version ist da: jetzt aktualisieren?
     Update { version: String },
+    /// Ein Tabellenblatt umbenennen (mit Eingabefeld).
+    Umbenennen { blatt: usize, name: String },
 }
 
 /// Zustand der einfachen Oberfläche.
@@ -89,6 +98,8 @@ pub struct Zustand {
     pub info_offen: bool,
     /// Nach der Speichern-Rückfrage: das Update jetzt laden.
     pub update_laden: bool,
+    /// Das gewählte Register der Leiste.
+    pub register: Register,
 }
 
 /// Schriftgrößen zur Auswahl (feste Stufen).
@@ -126,7 +137,9 @@ pub fn uebersetzung(text: &str) -> Option<&'static str> {
         "Two-sided: short edge" => "Beidseitig (kurze Kante)",
         "Grayscale" => "Graustufen",
         "Finding printers…" => "Drucker werden gesucht …",
-        "No printers found. Configure a system printer or export a PDF." => "Kein Drucker gefunden. Bitte einen Drucker in Windows einrichten oder als PDF speichern.",
+        "No printers found. Configure a system printer or export a PDF." => {
+            "Kein Drucker gefunden. Bitte einen Drucker in Windows einrichten oder als PDF speichern."
+        }
         "Printer discovery failed." => "Die Druckersuche hat nicht geklappt.",
         "Submitting print job…" => "Wird an den Drucker geschickt …",
         "Print job submitted." => "Wurde an den Drucker geschickt.",
@@ -143,17 +156,136 @@ pub fn gesperrt(app: &SheetApp, id: &str) -> Option<String> {
     (spec.enabled)(&app.session).err()
 }
 
-/// Eine große, beschriftete Schaltfläche. `aus` sperrt sie mit Begründung; `an` zeigt sie
-/// eingedrückt (z. B. „Fett“, wenn die Zelle fett ist).
+/// Das Symbol über der Beschriftung einer Kachel: GridCraft's gezeichnete Icons (keine
+/// Schriftzeichen, die einer Schrift fehlen könnten). Zentral, damit alle Knöpfe gleich aussehen.
+fn symbol(text: &str) -> Option<crate::icons::Icon> {
+    use crate::icons::Icon;
+    Some(match text {
+        "Neu" => Icon::NewFile,
+        "Öffnen" => Icon::OpenFolder,
+        "Speichern" | "Speichern unter" => Icon::Save,
+        "Rückgängig" => Icon::Undo,
+        "Wiederholen" => Icon::Redo,
+        "Kopieren" => Icon::Copy,
+        "Ausschneiden" => Icon::Cut,
+        "Einfügen" => Icon::Paste,
+        "Inhalt löschen" => Icon::Eraser,
+        "Σ Summe" | "Summe" => Icon::Sum,
+        "Fett" => Icon::Bold,
+        "Kursiv" => Icon::Italic,
+        "Unterstrichen" => Icon::Underline,
+        "Links" => Icon::AlignLeft,
+        "Mitte" => Icon::AlignCenter,
+        "Rechts" => Icon::AlignRight,
+        "Euro €" => Icon::Currency,
+        "Zellen verbinden" | "Verbindung trennen" => Icon::Merge,
+        "Außen" => Icon::BorderOutside,
+        "Innen" => Icon::Borders,
+        "Alle" => Icon::BorderAll,
+        "Keine" => Icon::BorderNone,
+        "Zeile hinzufügen" | "Spalte hinzufügen" => Icon::Insert,
+        "Zeile entfernen" | "Spalte entfernen" => Icon::Delete,
+        "Spaltenbreite …" | "Zeilenhöhe …" => Icon::Format,
+        "Seitenansicht und Drucken" => Icon::Print,
+        "Druckbereich festlegen" | "Druckbereich aufheben" => Icon::PrintArea,
+        "Info und Einstellungen" => Icon::Info,
+        "Nach Updates suchen" => Icon::Search,
+        "Textfarbe" => Icon::FontColor,
+        "Hintergrund" => Icon::Fill,
+        "Linienfarbe" => Icon::Borders,
+        _ => return None,
+    })
+}
+
+/// Eine große, beschriftete Schaltfläche (Kachel: Symbol über der Beschriftung, sonst nur Text).
+/// `aus` sperrt sie mit Begründung; `an` zeigt sie eingedrückt (z. B. „Fett“, wenn die Zelle fett ist).
 fn knopf(ui: &mut Ui, text: &str, tipp: &str, aus: Option<&str>, an: bool) -> bool {
-    let beschriftung = RichText::new(text).font(theme::ui_font(masse::SCHRIFT));
-    let b = egui::Button::new(beschriftung).selected(an).min_size(vec2(masse::KNOPF_BREITE, masse::KNOPF_HOEHE));
+    let t = Tokens::get(ui.ctx());
+    let farbe = if aus.is_some() {
+        t.text_disabled
+    } else if an {
+        t.accent_dark
+    } else {
+        t.text
+    };
+    if let Some(sym) = symbol(text) {
+        return kachel(ui, sym, text.trim_start_matches("Σ "), tipp, aus, an);
+    }
+    let b = egui::Button::new(RichText::new(text).font(theme::ui_bold(masse::SCHRIFT)).color(farbe))
+        .selected(an)
+        .min_size(vec2(masse::KNOPF_BREITE, masse::KNOPF_HOEHE))
+        .corner_radius(10.0);
     let r = ui.add_enabled(aus.is_none(), b);
     let r = match aus {
         Some(grund) => r.on_disabled_hover_text(format!("{tipp}\n\n{grund}")),
         None => r.on_hover_text(tipp),
     };
     r.clicked()
+}
+
+/// Eine Kachel: großes Symbol, darunter die Beschriftung, beides mittig; so breit wie nötig.
+fn kachel(ui: &mut Ui, sym: crate::icons::Icon, text: &str, tipp: &str, aus: Option<&str>, an: bool) -> bool {
+    let r = kachel_antwort(ui, sym, text, tipp, aus, an);
+    aus.is_none() && r.clicked()
+}
+
+/// Wie [`kachel`], gibt aber die egui-Antwort zurück (z. B. um ein Auswahlfenster daran zu hängen).
+fn kachel_antwort(ui: &mut Ui, sym: crate::icons::Icon, text: &str, tipp: &str, aus: Option<&str>, an: bool) -> egui::Response {
+    let t = Tokens::get(ui.ctx());
+    let schrift = theme::ui_bold(masse::SCHRIFT);
+    let farbe = if aus.is_some() {
+        t.text_disabled
+    } else if an {
+        t.accent_dark
+    } else {
+        t.text
+    };
+    let symbol_farbe = if aus.is_some() { t.text_disabled } else { t.accent };
+    let galley = ui.painter().layout_no_wrap(text.to_string(), schrift.clone(), farbe);
+    let breite = (galley.size().x + 20.0).max(masse::KACHEL_BREITE);
+    let sense = if aus.is_some() { egui::Sense::hover() } else { egui::Sense::click() };
+    // In sehr niedrigen Fenstern: kompakte Kacheln ohne Symbol, damit die Tabelle sichtbar bleibt.
+    let kompakt = ui.ctx().content_rect().height() < 640.0;
+    let hoehe = if kompakt { masse::KNOPF_HOEHE } else { masse::KACHEL_HOEHE };
+    let (rect, r) = ui.allocate_exact_size(vec2(breite, hoehe), sense);
+    let (fill, rand) = if an {
+        (t.accent_soft, t.accent)
+    } else if aus.is_none() && r.is_pointer_button_down_on() {
+        (t.pressed, t.accent)
+    } else if aus.is_none() && r.hovered() {
+        (t.accent_soft, t.accent)
+    } else {
+        (egui::Color32::WHITE, t.ribbon_border)
+    };
+    let p = ui.painter();
+    p.rect(rect, 10.0, fill, egui::Stroke::new(if an || r.hovered() { 2.5 } else { 1.5 }, rand), egui::StrokeKind::Inside);
+    if r.has_focus() {
+        p.rect_stroke(rect.expand(3.0), 12.0, egui::Stroke::new(3.0, egui::Color32::from_rgb(0xF5, 0x9E, 0x0B)), egui::StrokeKind::Outside);
+    }
+    if kompakt {
+        p.galley(rect.center() - galley.size() / 2.0, galley, farbe);
+    } else {
+        crate::icons::paint(
+            p,
+            egui::Rect::from_center_size(egui::pos2(rect.center().x, rect.top() + 30.0), vec2(masse::SYMBOL, masse::SYMBOL)),
+            sym,
+            symbol_farbe,
+        );
+        p.galley(egui::pos2(rect.center().x - galley.size().x / 2.0, rect.bottom() - 16.0 - galley.size().y), galley, farbe);
+    }
+    r.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, aus.is_none(), text));
+    let r = match aus {
+        Some(grund) => r.on_hover_text(format!(
+            "{tipp}
+
+{grund}"
+        )),
+        None => r.on_hover_text(tipp),
+    };
+    if aus.is_none() && r.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    r
 }
 
 /// Eine Schaltfläche, die einen Engine-Befehl ausführt; gesperrt, solange der Befehl nicht geht.
@@ -164,68 +296,226 @@ fn befehl(app: &mut SheetApp, ui: &mut Ui, text: &str, tipp: &str, id: &str, par
     }
 }
 
-/// Eine Gruppe von Schaltflächen mit kleiner Überschrift. Passt sie nicht mehr in die Zeile,
-/// beginnt sie eine neue (die Breite stammt aus dem vorigen Bild).
-fn gruppe(ui: &mut Ui, titel: &str, inhalt: impl FnOnce(&mut Ui)) {
+/// Senkrechter Trennstrich zwischen zwei Knopfgruppen eines Registers.
+fn trenner(ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    let id = egui::Id::unique(("simplegrid_gruppe", titel));
-    let breite: Option<f32> = ui.ctx().data(|d| d.get_temp(id));
-    let rest = ui.max_rect().right() - ui.cursor().min.x;
-    if breite.is_some_and(|b| b > rest + 0.5) && ui.cursor().min.x > ui.max_rect().min.x + 1.0 {
-        ui.end_row();
-    }
-    let r = egui::Frame::NONE.fill(t.ribbon).stroke(egui::Stroke::new(1.0, t.ribbon_border)).corner_radius(8.0).inner_margin(6.0).show(ui, |ui| {
-        ui.vertical(|ui| {
-            ui.label(RichText::new(titel).font(theme::ui_font(masse::GRUPPEN_SCHRIFT)).color(t.text_dim));
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = masse::ABSTAND;
-                inhalt(ui);
-            });
-        });
-    });
-    let w = r.response.rect.width();
-    if breite.is_none_or(|b| (b - w).abs() > 0.5) {
-        ui.ctx().data_mut(|d| d.insert_temp(id, w));
-        ui.ctx().request_repaint();
+    let (r, _) = ui.allocate_exact_size(vec2(14.0, masse::KACHEL_HOEHE), egui::Sense::hover());
+    ui.painter()
+        .line_segment([egui::pos2(r.center().x, r.top() + 8.0), egui::pos2(r.center().x, r.bottom() - 8.0)], egui::Stroke::new(2.0, t.ribbon_border));
+}
+
+/// Das SimpleGrid-Symbol aus dem Branding (grünes Blatt mit Eselsohr und 3×3-Raster), gezeichnet.
+pub fn logo(ui: &mut Ui, hoehe: f32) {
+    let (r, _) = ui.allocate_exact_size(vec2(hoehe * 512.0 / 452.0, hoehe), egui::Sense::hover());
+    let p = ui.painter();
+    let k = r.height() / 452.0;
+    let pt = |x: f32, y: f32| egui::pos2(r.left() + x * k, r.top() + y * k);
+    let gruen = egui::Color32::from_rgb(0x10, 0xB9, 0x81);
+    // Blatt mit abgeschnittener Ecke oben rechts.
+    let blatt = vec![pt(81.0, 38.0), pt(335.0, 38.0), pt(452.0, 156.0), pt(452.0, 414.0), pt(81.0, 414.0)];
+    p.add(egui::Shape::convex_polygon(blatt, gruen, egui::Stroke::NONE));
+    p.add(egui::Shape::convex_polygon(
+        vec![pt(335.0, 38.0), pt(452.0, 156.0), pt(335.0, 156.0)],
+        egui::Color32::from_rgb(0x6E, 0xE7, 0xB7),
+        egui::Stroke::NONE,
+    ));
+    for zeile in 0..3 {
+        for spalte in 0..3 {
+            let x = 139.0 + spalte as f32 * 90.0;
+            let y = 166.0 + zeile as f32 * 64.0;
+            p.rect_filled(egui::Rect::from_min_max(pt(x, y), pt(x + 78.0, y + 52.0)), 1.0, egui::Color32::WHITE);
+        }
     }
 }
 
-/// Zeichnet die feste Schaltflächenleiste oben im Fenster.
+/// Die Register der Leiste (Variante A aus Phase 10).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Register {
+    #[default]
+    Start,
+    Schrift,
+    Rahmen,
+    ZeilenSpalten,
+    Drucken,
+    Hilfe,
+}
+
+impl Register {
+    pub const ALLE: [Register; 6] =
+        [Register::Start, Register::Schrift, Register::Rahmen, Register::ZeilenSpalten, Register::Drucken, Register::Hilfe];
+    pub fn name(self) -> &'static str {
+        match self {
+            Register::Start => "Start",
+            Register::Schrift => "Schrift und Farbe",
+            Register::Rahmen => "Rahmen und Zellen",
+            Register::ZeilenSpalten => "Zeilen und Spalten",
+            Register::Drucken => "Drucken",
+            Register::Hilfe => "Hilfe",
+        }
+    }
+}
+
+/// Kopfzeile, Register und die Knöpfe des gewählten Registers.
 pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    // Die Leiste ist genau so hoch wie ihr Inhalt im vorigen Bild (Gruppen brechen um).
-    let hoehe_id = egui::Id::unique("simplegrid_leiste_hoehe");
-    let hoehe: f32 = ui.ctx().data(|d| d.get_temp(hoehe_id)).unwrap_or(masse::KNOPF_HOEHE + 48.0);
-    let mut gemessen = hoehe;
-    // Höchstens 40 % der Fensterhöhe, damit die Tabelle auch in kleinen Fenstern sichtbar bleibt;
-    // was nicht passt, lässt sich in der Leiste rollen.
-    let hoechstens = (ui.ctx().content_rect().height() * 0.4).max(masse::KNOPF_HOEHE + 48.0);
-    egui::Panel::top("simplegrid_leiste").resizable(false).exact_size(hoehe.min(hoechstens)).frame(egui::Frame::NONE.fill(t.window).inner_margin(egui::Margin::same(8))).show(ui, |ui| {
-        let r = egui::ScrollArea::vertical().id_salt("simplegrid_leiste_rollen").auto_shrink([false, true]).show(ui, |ui| ui.horizontal_wrapped(|ui| {
-            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
-            gruppe(ui, "Datei", |ui| datei(app, ui));
-            gruppe(ui, "Bearbeiten", |ui| bearbeiten(app, ui));
-            gruppe(ui, "Rechnen", |ui| rechnen(app, ui));
-            gruppe(ui, "Zeilen und Spalten", |ui| zeilen_spalten(app, ui));
-            gruppe(ui, "Schrift", |ui| schrift(app, ui));
-            gruppe(ui, "Zellen", |ui| zellen(app, ui));
-            gruppe(ui, "Umrandung", |ui| umrandung(app, ui));
-            gruppe(ui, "Ansicht", |ui| ansicht(app, ui));
-            gruppe(ui, "Drucken", |ui| drucken(app, ui));
-            gruppe(ui, "Hilfe", |ui| {
-                if knopf(ui, "Info und Einstellungen", "Version, Einstellungen und Updates", None, false) {
-                    app.einfach.info_offen = true;
+    // Kopfzeile: Logo, Name, Datei, Speicherstand. In sehr niedrigen Fenstern entfällt sie,
+    // damit von der Tabelle genug sichtbar bleibt.
+    let niedrig = ui.ctx().content_rect().height() < 640.0;
+    if !niedrig {
+        egui::Panel::top("simplegrid_kopf")
+            .resizable(false)
+            .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(20, 10)))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    logo(ui, 36.0);
+                    ui.add_space(4.0);
+                    let mut job = egui::text::LayoutJob::default();
+                    job.append("Simple", 0.0, egui::TextFormat { font_id: theme::ui_bold(24.0), color: t.text, ..Default::default() });
+                    job.append("Grid", 0.0, egui::TextFormat { font_id: theme::ui_bold(24.0), color: t.accent, ..Default::default() });
+                    ui.label(job);
+                    let (titel, ungespeichert) = app.session.active().map(|d| (d.display_title(), d.is_dirty())).unwrap_or_default();
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(12.0);
+                    ui.label(RichText::new(titel).font(theme::ui_font(20.0)).color(t.text));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let (text, farbe) = if ungespeichert {
+                            ("Noch nicht gespeichert", egui::Color32::from_rgb(0xB4, 0x53, 0x09))
+                        } else {
+                            ("Alles gespeichert", t.accent)
+                        };
+                        ui.label(RichText::new(text).font(theme::ui_bold(17.0)).color(farbe));
+                    });
+                });
+            });
+    }
+    // Register (Reiter).
+    egui::Panel::top("simplegrid_register")
+        .resizable(false)
+        .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin { left: 20, right: 20, top: 4, bottom: 0 }))
+        .show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = vec2(6.0, 4.0);
+                for reg in Register::ALLE {
+                    let an = app.einfach.register == reg;
+                    let text = RichText::new(reg.name()).font(if an { theme::ui_bold(19.0) } else { theme::ui_font(19.0) }).color(if an {
+                        egui::Color32::WHITE
+                    } else {
+                        t.text
+                    });
+                    let b = egui::Button::new(text)
+                        .fill(if an { t.accent } else { t.window })
+                        .stroke(egui::Stroke::new(2.0, if an { t.accent } else { t.ribbon_border }))
+                        .corner_radius(egui::CornerRadius { nw: 10, ne: 10, sw: 0, se: 0 })
+                        .min_size(vec2(120.0, 50.0));
+                    if ui.add(b).on_hover_text(format!("Knöpfe für „{}“ zeigen", reg.name())).clicked() {
+                        app.einfach.register = reg;
+                    }
                 }
             });
-            gruppe(ui, "Tabellenblatt", |ui| blaetter(app, ui));
-        }).response);
-        gemessen = r.content_size.y + 16.0;
         });
-    if (gemessen - hoehe).abs() > 0.5 {
-        ui.ctx().data_mut(|d| d.insert_temp(hoehe_id, gemessen));
-        ui.ctx().request_repaint();
-    }
+    // Die Knöpfe des gewählten Registers in einer Reihe (bricht bei schmalen Fenstern um).
+    egui::Panel::top("simplegrid_knoepfe")
+        .resizable(false)
+        .frame(
+            egui::Frame::NONE
+                .fill(t.ribbon)
+                .inner_margin(egui::Margin { left: 20, right: 20, top: 14, bottom: 14 })
+                .stroke(egui::Stroke::new(1.0, t.ribbon_border)),
+        )
+        .show(ui, |ui| {
+            // Grüne Linie unter den Reitern.
+            let oben = ui.max_rect().top() - 14.0;
+            ui.painter().line_segment(
+                [egui::pos2(ui.max_rect().left() - 20.0, oben + 1.5), egui::pos2(ui.max_rect().right() + 20.0, oben + 1.5)],
+                egui::Stroke::new(3.0, t.accent),
+            );
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = vec2(masse::ABSTAND, 10.0);
+                ui.spacing_mut().interact_size.y = if ui.ctx().content_rect().height() < 640.0 { masse::KNOPF_HOEHE } else { masse::KACHEL_HOEHE };
+                ui.spacing_mut().button_padding = vec2(14.0, 8.0);
+                match app.einfach.register {
+                    Register::Start => {
+                        datei(app, ui);
+                        trenner(ui);
+                        bearbeiten(app, ui);
+                        trenner(ui);
+                        rechnen(app, ui);
+                    }
+                    Register::Schrift => {
+                        schrift(app, ui);
+                        trenner(ui);
+                        zellen(app, ui);
+                    }
+                    Register::Rahmen => {
+                        umrandung(app, ui);
+                        trenner(ui);
+                        verbinden_knoepfe(app, ui);
+                    }
+                    Register::ZeilenSpalten => zeilen_spalten(app, ui),
+                    Register::Drucken => drucken(app, ui),
+                    Register::Hilfe => {
+                        if knopf(ui, "Info und Einstellungen", "Version, Einstellungen und Updates", None, false) {
+                            app.einfach.info_offen = true;
+                        }
+                        if knopf(ui, "Nach Updates suchen", "Jetzt im Internet nachsehen, ob es eine neue Version gibt", None, false) {
+                            app.check_for_updates();
+                        }
+                    }
+                }
+            });
+        });
     fehler_hinweis(app, ui);
+}
+
+/// Die Fußzeile: Tabellenblätter als große Reiter, Blatt-Knöpfe und Zoom.
+pub fn fusszeile(app: &mut SheetApp, ui: &mut Ui) {
+    let t = Tokens::get(ui.ctx());
+    egui::Panel::bottom("simplegrid_fuss")
+        .resizable(false)
+        .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(20, 8)).stroke(egui::Stroke::new(1.0, t.ribbon_border)))
+        .show(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = vec2(8.0, 6.0);
+                let (aktiv, namen) = app
+                    .session
+                    .active()
+                    .map(|d| (d.wb.active_sheet.get(), d.wb.sheets.iter().map(|s| s.name.clone()).collect::<Vec<_>>()))
+                    .unwrap_or_default();
+                for (i, name) in namen.iter().enumerate() {
+                    let an = i == aktiv;
+                    let b = egui::Button::new(RichText::new(name).font(if an { theme::ui_bold(18.0) } else { theme::ui_font(18.0) }).color(if an {
+                        t.accent_dark
+                    } else {
+                        t.text
+                    }))
+                    .fill(if an { t.accent_soft } else { t.ribbon })
+                    .stroke(egui::Stroke::new(if an { 3.0 } else { 2.0 }, if an { t.accent } else { t.ribbon_border }))
+                    .corner_radius(10.0)
+                    .min_size(vec2(110.0, 48.0));
+                    let r = ui.add(b).on_hover_text("Dieses Blatt zeigen (Doppelklick: umbenennen)");
+                    if r.double_clicked() {
+                        app.einfach.frage = Some(Frage::Umbenennen { blatt: i, name: name.clone() });
+                    } else if r.clicked() && !an {
+                        app.run_or_alert("sheet.activate", json!({"sheet": i}));
+                    }
+                }
+                blaetter(app, ui);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    ansicht_rechts(app, ui);
+                });
+            });
+        });
+    // Waagerechte Bildlaufleiste der Tabelle (GridCraft), über der Fußzeile, gut greifbar.
+    app.grid.hscroll = None;
+    egui::Panel::bottom("simplegrid_bildlauf").resizable(false).exact_size(26.0).frame(egui::Frame::NONE.fill(t.window)).show(ui, |ui| {
+        let platz = ui.available_rect_before_wrap();
+        let links = app.grid.rect.map_or(platz.left(), |r| r.left()).max(platz.left());
+        let rechts = app.grid.rect.map_or(platz.right(), |r| r.right()).min(platz.right());
+        let spur = egui::Rect::from_min_max(egui::pos2(links + 40.0, platz.center().y - 9.0), egui::pos2(rechts, platz.center().y + 9.0));
+        crate::grid::horizontal_scrollbar(app, ui, spur, &t);
+    });
 }
 
 fn datei(app: &mut SheetApp, ui: &mut Ui) {
@@ -331,11 +621,11 @@ pub fn oeffnen_pfad(app: &mut SheetApp, pfad: &str) {
 
 fn bearbeiten(app: &mut SheetApp, ui: &mut Ui) {
     let undo_aus = gesperrt(app, "edit.undo").map(|_| "Es gibt nichts rückgängig zu machen.");
-    if knopf(ui, "↶ Rückgängig", "Den letzten Schritt zurücknehmen (auch Strg+Z)", undo_aus, false) {
+    if knopf(ui, "Rückgängig", "Den letzten Schritt zurücknehmen (auch Strg+Z)", undo_aus, false) {
         app.run_or_alert("edit.undo", json!({}));
     }
     let redo_aus = gesperrt(app, "edit.redo").map(|_| "Es gibt nichts zu wiederholen.");
-    if knopf(ui, "↷ Wiederholen", "Den zurückgenommenen Schritt wiederholen (auch Strg+Y)", redo_aus, false) {
+    if knopf(ui, "Wiederholen", "Den zurückgenommenen Schritt wiederholen (auch Strg+Y)", redo_aus, false) {
         app.run_or_alert("edit.redo", json!({}));
     }
     let ohne = gesperrt(app, "edit.copy").map(|_| texte::NICHT_MOEGLICH);
@@ -368,20 +658,14 @@ fn aktiver_stil(app: &SheetApp) -> simplegrid_engine::model::Style {
 /// öffnet. Gibt die gewählte Farbe (`#RRGGBB` oder `none`) zurück.
 fn farbknopf(app: &SheetApp, ui: &mut Ui, text: &str, tipp: &str, ohne_farbe: &str, aus: Option<&str>) -> Option<String> {
     let id = ui.scope_id().with(("simplegrid_farbe", text));
-    let r = ui.add_enabled(
-        aus.is_none(),
-        egui::Button::new(RichText::new(format!("{text} ▾")).font(theme::ui_font(masse::SCHRIFT))).min_size(vec2(masse::KNOPF_BREITE, masse::KNOPF_HOEHE)),
-    );
-    let r = match aus {
-        Some(grund) => r.on_disabled_hover_text(format!("{tipp}\n\n{grund}")),
-        None => r.on_hover_text(tipp),
-    };
+    let sym = symbol(text).unwrap_or(crate::icons::Icon::Fill);
+    let r = kachel_antwort(ui, sym, text, tipp, aus, false);
     let farben = app.session.active().map(|d| d.wb.theme.colors).unwrap_or(simplegrid_engine::model::Theme::default().colors);
     let mut gewaehlt = None;
     egui::Popup::menu(&r)
         .id(id)
         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-        .open_memory(r.clicked().then_some(egui::SetOpenCommand::Toggle))
+        .open_memory((aus.is_none() && r.clicked()).then_some(egui::SetOpenCommand::Toggle))
         .show(|ui| {
             if let Some(c) = crate::widgets::color_palette_fixed(ui, &farben, ohne_farbe) {
                 gewaehlt = Some(c);
@@ -407,7 +691,10 @@ fn schrift(app: &mut SheetApp, ui: &mut Ui) {
     // Schriftgröße: ein Auswahlfeld mit festen Stufen.
     let mut groesse = st.font.size;
     egui::ComboBox::from_id_salt("simplegrid_schriftgroesse")
-        .selected_text(RichText::new(format!("Größe {}", simplegrid_engine::core::locale::localize_number_text(&format!("{groesse}")))).font(theme::ui_font(masse::SCHRIFT)))
+        .selected_text(
+            RichText::new(format!("Größe {}", simplegrid_engine::core::locale::localize_number_text(&format!("{groesse}"))))
+                .font(theme::ui_font(masse::SCHRIFT)),
+        )
         .width(masse::KNOPF_BREITE + 30.0)
         .height(400.0)
         .show_ui(ui, |ui| {
@@ -444,10 +731,19 @@ fn zellen(app: &mut SheetApp, ui: &mut Ui) {
     if knopf(ui, "Euro €", "Zahlen als Geldbetrag zeigen, z. B. 1.234,56 € (noch einmal klicken: normale Zahl)", ohne, euro) {
         euro_umschalten(app, euro);
     }
+}
+
+/// „Zellen verbinden“ und „Verbindung trennen“.
+fn verbinden_knoepfe(app: &mut SheetApp, ui: &mut Ui) {
+    let ohne = gesperrt(app, "home.mergeCells").map(|_| texte::NICHT_MOEGLICH);
     if knopf(ui, "Zellen verbinden", "Die markierten Zellen zu einer großen Zelle verbinden", ohne, false) {
         verbinden(app);
     }
-    let in_verbund = app.session.active().and_then(|d| d.wb.active().map(|sh| (sh.merges.clone(), d.selection.current()))).is_some_and(|(m, r)| m.iter().any(|x| x.intersects(&r)));
+    let in_verbund = app
+        .session
+        .active()
+        .and_then(|d| d.wb.active().map(|sh| (sh.merges.clone(), d.selection.current())))
+        .is_some_and(|(m, r)| m.iter().any(|x| x.intersects(&r)));
     let trennen_aus = if in_verbund { ohne } else { Some("Hier sind keine verbundenen Zellen markiert.") };
     if knopf(ui, "Verbindung trennen", "Verbundene Zellen wieder in einzelne Zellen teilen", trennen_aus, false) {
         app.run_or_alert("home.unmergeCells", json!({}));
@@ -522,19 +818,30 @@ pub fn umranden(app: &mut SheetApp, preset: &str) {
     app.run_or_alert("home.borders", params);
 }
 
-fn ansicht(app: &mut SheetApp, ui: &mut Ui) {
+/// Zoom „− Kleiner  120 %  + Größer“ in der Fußzeile (rechtsbündig, daher von rechts gezeichnet).
+fn ansicht_rechts(app: &mut SheetApp, ui: &mut Ui) {
     let zoom = app.session.active().and_then(|d| d.wb.active().map(|s| u32::from(s.zoom))).unwrap_or(100);
     let ohne = gesperrt(app, "view.zoom").map(|_| texte::NICHT_MOEGLICH);
     let kleiner = ZOOMSTUFEN.iter().rev().find(|z| **z < zoom).copied();
     let groesser = ZOOMSTUFEN.iter().find(|z| **z > zoom).copied();
-    if knopf(ui, "− Kleiner", "Die Tabelle kleiner anzeigen (ändert nicht den Druck)", if kleiner.is_none() { Some("Kleiner geht es nicht.") } else { ohne }, false)
-        && let Some(z) = kleiner
+    if knopf(
+        ui,
+        "+ Größer",
+        "Die Tabelle größer anzeigen (ändert nicht den Druck)",
+        if groesser.is_none() { Some("Größer geht es nicht.") } else { ohne },
+        false,
+    ) && let Some(z) = groesser
     {
         app.run_or_alert("view.zoom", json!({"percent": z}));
     }
-    ui.label(RichText::new(format!("{zoom} %")).font(theme::ui_bold(masse::SCHRIFT)));
-    if knopf(ui, "+ Größer", "Die Tabelle größer anzeigen (ändert nicht den Druck)", if groesser.is_none() { Some("Größer geht es nicht.") } else { ohne }, false)
-        && let Some(z) = groesser
+    ui.label(RichText::new(format!("{zoom} %")).font(theme::ui_bold(masse::SCHRIFT + 1.0)));
+    if knopf(
+        ui,
+        "– Kleiner",
+        "Die Tabelle kleiner anzeigen (ändert nicht den Druck)",
+        if kleiner.is_none() { Some("Kleiner geht es nicht.") } else { ohne },
+        false,
+    ) && let Some(z) = kleiner
     {
         app.run_or_alert("view.zoom", json!({"percent": z}));
     }
@@ -584,7 +891,9 @@ fn info_fenster(app: &mut SheetApp, ctx: &egui::Context) {
         ui.label(RichText::new("SimpleGrid").font(theme::ui_bold(masse::SCHRIFT + 6.0)));
         ui.label(RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION"))).font(theme::ui_font(masse::SCHRIFT)));
         ui.add_space(4.0);
-        ui.label(RichText::new("Ein einfaches Tabellenprogramm. Beruht auf GridCraft (MIT OR Apache-2.0).").font(theme::ui_font(masse::SCHRIFT - 2.0)));
+        ui.label(
+            RichText::new("Ein einfaches Tabellenprogramm. Beruht auf GridCraft (MIT OR Apache-2.0).").font(theme::ui_font(masse::SCHRIFT - 2.0)),
+        );
         ui.add_space(12.0);
         ui.label(RichText::new("Einstellungen").font(theme::ui_bold(masse::SCHRIFT)));
         let mut an = app.ui.letzte_datei_oeffnen;
@@ -629,15 +938,26 @@ fn fehler_hinweis(app: &SheetApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     egui::Panel::top("simplegrid_fehler")
         .resizable(false)
-        .frame(egui::Frame::NONE.fill(t.notice_warn_bg).stroke(egui::Stroke::new(1.0, t.notice_warn_border)).inner_margin(egui::Margin::symmetric(12, 8)))
+        .frame(
+            egui::Frame::NONE
+                .fill(t.notice_warn_bg)
+                .stroke(egui::Stroke::new(1.0, t.notice_warn_border))
+                .inner_margin(egui::Margin::symmetric(12, 8)),
+        )
         .show(ui, |ui| {
-            ui.label(RichText::new(format!("⚠ {text}")).font(theme::ui_font(masse::SCHRIFT)).color(t.text));
+            ui.label(RichText::new(format!("Achtung – {text}")).font(theme::ui_font(masse::SCHRIFT)).color(t.text));
         });
 }
 
 fn rechnen(app: &mut SheetApp, ui: &mut Ui) {
     let ohne = gesperrt(app, "formulas.autoSum").map(|_| texte::NICHT_MOEGLICH);
-    if knopf(ui, "Σ Summe", "Zahlen zusammenzählen: Bereich markieren und klicken – die Summe kommt darunter (bei einer Zeile rechts daneben)", ohne, false) {
+    if knopf(
+        ui,
+        "Σ Summe",
+        "Zahlen zusammenzählen: Bereich markieren und klicken – die Summe kommt darunter (bei einer Zeile rechts daneben)",
+        ohne,
+        false,
+    ) {
         summe(app);
     }
 }
@@ -691,7 +1011,8 @@ fn drucken(app: &mut SheetApp, ui: &mut Ui) {
         app.run_or_alert("pageLayout.printArea", json!({}));
     }
     let bereich = app.session.active().and_then(|d| d.wb.active().and_then(|s| s.print.print_area)).map(|r| r.a1());
-    let aufheben_aus = if bereich.is_some() { ohne } else { Some("Es ist kein Druckbereich festgelegt: gedruckt wird alles, was auf dem Blatt steht.") };
+    let aufheben_aus =
+        if bereich.is_some() { ohne } else { Some("Es ist kein Druckbereich festgelegt: gedruckt wird alles, was auf dem Blatt steht.") };
     let tipp = match &bereich {
         Some(b) => format!("Wieder alles drucken statt nur {b}"),
         None => "Wieder alles drucken".into(),
@@ -705,19 +1026,37 @@ fn zeilen_spalten(app: &mut SheetApp, ui: &mut Ui) {
     let ohne = gesperrt(app, "home.insertRows").map(|_| texte::NICHT_MOEGLICH);
     let (zeilen, spalten) = auswahl_zeilen_spalten(app);
     let mehrzahl = |n: u32, eins: &str, viele: &str| if n > 1 { format!("{n} {viele}") } else { eins.to_string() };
-    if knopf(ui, "Zeile hinzufügen", &format!("{} über der Markierung einfügen", mehrzahl(zeilen.1 - zeilen.0 + 1, "Eine leere Zeile", "leere Zeilen")), ohne, false) {
+    if knopf(
+        ui,
+        "Zeile hinzufügen",
+        &format!("{} über der Markierung einfügen", mehrzahl(zeilen.1 - zeilen.0 + 1, "Eine leere Zeile", "leere Zeilen")),
+        ohne,
+        false,
+    ) {
         app.run_or_alert("home.insertRows", json!({}));
     }
     if knopf(ui, "Zeile entfernen", "Die markierten Zeilen entfernen (mit Rückfrage, wenn Daten darin stehen)", ohne, false) {
         entfernen(app, true);
     }
-    if knopf(ui, "Spalte hinzufügen", &format!("{} links neben der Markierung einfügen", mehrzahl(spalten.1 - spalten.0 + 1, "Eine leere Spalte", "leere Spalten")), ohne, false) {
+    if knopf(
+        ui,
+        "Spalte hinzufügen",
+        &format!("{} links neben der Markierung einfügen", mehrzahl(spalten.1 - spalten.0 + 1, "Eine leere Spalte", "leere Spalten")),
+        ohne,
+        false,
+    ) {
         app.run_or_alert("home.insertColumns", json!({}));
     }
     if knopf(ui, "Spalte entfernen", "Die markierten Spalten entfernen (mit Rückfrage, wenn Daten darin stehen)", ohne, false) {
         entfernen(app, false);
     }
-    if knopf(ui, "Spaltenbreite …", "Die Breite der markierten Spalten als Zahl eingeben (man kann auch die Linie im Spaltenkopf ziehen)", ohne, false) {
+    if knopf(
+        ui,
+        "Spaltenbreite …",
+        "Die Breite der markierten Spalten als Zahl eingeben (man kann auch die Linie im Spaltenkopf ziehen)",
+        ohne,
+        false,
+    ) {
         app.open_dialog("columnWidth", json!({}));
     }
     if knopf(ui, "Zeilenhöhe …", "Die Höhe der markierten Zeilen als Zahl eingeben (man kann auch die Linie im Zeilenkopf ziehen)", ohne, false) {
@@ -775,25 +1114,45 @@ fn blaetter(app: &mut SheetApp, ui: &mut Ui) {
         .map(|d| (d.wb.active_sheet.get(), d.wb.sheets.len(), d.wb.active().map(|s| s.name.clone()).unwrap_or_default()))
         .unwrap_or((0, 0, String::new()));
     let ohne = gesperrt(app, "home.insertSheet").map(|_| texte::NICHT_MOEGLICH);
-    if knopf(ui, "Blatt hinzufügen", "Ein neues, leeres Tabellenblatt hinten anfügen", ohne, false) {
+    if knopf(ui, "+ Blatt hinzufügen", "Ein neues, leeres Tabellenblatt hinten anfügen", ohne, false) {
         app.run_or_alert("home.insertSheet", json!({"before": anzahl}));
     }
-    if knopf(ui, "Blatt umbenennen", "Dem aktuellen Blatt einen neuen Namen geben", ohne, false) {
-        app.grid.renaming_tab = Some(aktiv);
-        app.grid.rename_text = name.clone();
+    if knopf(ui, "Umbenennen", "Dem aktuellen Blatt einen neuen Namen geben", ohne, false) {
+        app.einfach.frage = Some(Frage::Umbenennen { blatt: aktiv, name: name.clone() });
     }
     let loeschen_aus = if anzahl <= 1 { Some(texte::LETZTES_BLATT) } else { ohne };
-    if knopf(ui, "Blatt löschen", "Das aktuelle Blatt löschen (mit Rückfrage)", loeschen_aus, false) {
+    if knopf(ui, "Löschen", "Das aktuelle Blatt löschen (mit Rückfrage)", loeschen_aus, false) {
         app.einfach.frage = Some(Frage::BlattLoeschen { blatt: aktiv, name: name.clone() });
     }
     let links_aus = if aktiv == 0 { Some("Das Blatt steht schon ganz links.") } else { ohne };
-    if knopf(ui, "◀ Blatt nach links", "Das aktuelle Blatt eine Stelle nach links schieben", links_aus, false) {
+    if knopf(ui, "◀", "Das aktuelle Blatt eine Stelle nach links schieben", links_aus, false) {
         app.run_or_alert("sheet.move", json!({"sheet": aktiv, "to": aktiv.saturating_sub(1)}));
     }
     let rechts_aus = if aktiv + 1 >= anzahl { Some("Das Blatt steht schon ganz rechts.") } else { ohne };
-    if knopf(ui, "Blatt nach rechts ▶", "Das aktuelle Blatt eine Stelle nach rechts schieben", rechts_aus, false) {
+    if knopf(ui, "▶", "Das aktuelle Blatt eine Stelle nach rechts schieben", rechts_aus, false) {
         app.run_or_alert("sheet.move", json!({"sheet": aktiv, "to": aktiv + 1}));
     }
+}
+
+/// Ein Knopf in einer Rückfrage: der erste ist die Hauptaktion (grün gefüllt), „Nicht speichern“
+/// und „Löschen“/„Entfernen“ sind rot umrandet, „Abbrechen“ und „Später“ grau.
+fn dialogknopf(ui: &mut Ui, text: &str, nr: usize) -> bool {
+    let t = Tokens::get(ui.ctx());
+    let rot = egui::Color32::from_rgb(0xB9, 0x1C, 0x1C);
+    let gefaehrlich = matches!(text, "Nicht speichern" | "Löschen" | "Entfernen" | "Nicht wiederherstellen");
+    let (fill, rand, farbe) = if nr == 0 && !gefaehrlich {
+        (t.accent, t.accent, egui::Color32::WHITE)
+    } else if gefaehrlich {
+        (egui::Color32::WHITE, rot, rot)
+    } else {
+        (egui::Color32::from_rgb(0xF9, 0xFA, 0xFB), egui::Color32::from_rgb(0x9C, 0xA3, 0xAF), t.text)
+    };
+    let b = egui::Button::new(RichText::new(text).font(theme::ui_bold(21.0)).color(farbe))
+        .fill(fill)
+        .stroke(egui::Stroke::new(3.0, rand))
+        .corner_radius(14.0)
+        .min_size(vec2(190.0, 68.0));
+    ui.add(b).clicked()
 }
 
 /// „Neu“ oder „Öffnen“: bei ungespeicherten Änderungen erst fragen.
@@ -843,43 +1202,97 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
     let (titel, text, knoepfe): (&str, String, Vec<&str>) = match &frage {
         Frage::Ungespeichert { .. } => {
             let name = app.session.active().map(|d| d.display_title()).unwrap_or_default();
-            (texte::UNGESPEICHERT_TITEL, texte::UNGESPEICHERT_TEXT.replace("{}", &name), vec![texte::SPEICHERN, texte::NICHT_SPEICHERN, texte::ABBRECHEN])
+            (
+                texte::UNGESPEICHERT_TITEL,
+                texte::UNGESPEICHERT_TEXT.replace("{}", &name),
+                vec![texte::SPEICHERN, texte::NICHT_SPEICHERN, texte::ABBRECHEN],
+            )
         }
-        Frage::BlattLoeschen { name, .. } => (texte::BLATT_LOESCHEN_TITEL, texte::BLATT_LOESCHEN_TEXT.replace("{}", name), vec![texte::LOESCHEN, texte::ABBRECHEN]),
+        Frage::BlattLoeschen { name, .. } => {
+            (texte::BLATT_LOESCHEN_TITEL, texte::BLATT_LOESCHEN_TEXT.replace("{}", name), vec![texte::LOESCHEN, texte::ABBRECHEN])
+        }
         Frage::Bestaetigen { titel, text, knopf, .. } => (titel.as_str(), text.clone(), vec![knopf.as_str(), texte::ABBRECHEN]),
         Frage::Update { version } => (
             "Neue Version",
             format!("Es gibt eine neue Version von SimpleGrid ({version}). Jetzt aktualisieren? Das Programm startet danach von selbst neu."),
             vec!["Jetzt aktualisieren", "Später"],
         ),
+        Frage::Umbenennen { .. } => ("Blatt umbenennen", "Wie soll das Blatt heißen?".to_string(), vec!["Umbenennen", texte::ABBRECHEN]),
         Frage::Wiederherstellen { titel, zeit } => (
             "Tabelle wiederherstellen?",
-            format!("SimpleGrid wurde beim letzten Mal nicht richtig beendet. Es gibt eine Sicherung von „{titel}“ vom {zeit}. Möchten Sie sie wiederherstellen?"),
+            format!(
+                "SimpleGrid wurde beim letzten Mal nicht richtig beendet. Es gibt eine Sicherung von „{titel}“ vom {zeit}. Möchten Sie sie wiederherstellen?"
+            ),
             vec!["Wiederherstellen", "Nicht wiederherstellen"],
         ),
     };
     let mut gewaehlt: Option<&str> = None;
-    egui::Modal::new(egui::Id::unique("simplegrid.rueckfrage")).show(ctx, |ui| {
-        ui.set_width(460.0);
-        ui.label(RichText::new(titel).font(theme::ui_bold(masse::SCHRIFT + 2.0)));
-        ui.add_space(6.0);
-        ui.add(egui::Label::new(RichText::new(&text).font(theme::ui_font(masse::SCHRIFT))).wrap());
-        ui.add_space(12.0);
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = masse::ABSTAND * 2.0;
-            for k in &knoepfe {
-                if knopf(ui, k, k, None, false) {
-                    gewaehlt = Some(k);
+    let mut neuer_name: Option<String> = None;
+    egui::Modal::new(egui::Id::unique("simplegrid.rueckfrage"))
+        .frame(
+            egui::Frame::NONE
+                .fill(egui::Color32::WHITE)
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(0xD1, 0xD5, 0xDB)))
+                .inner_margin(egui::Margin::same(36))
+                .corner_radius(18.0),
+        )
+        .show(ctx, |ui| {
+            ui.set_width(640.0);
+            ui.horizontal(|ui| {
+                let (r, _) = ui.allocate_exact_size(vec2(56.0, 56.0), egui::Sense::hover());
+                ui.painter().circle(
+                    r.center(),
+                    27.0,
+                    egui::Color32::from_rgb(0xFE, 0xF3, 0xC7),
+                    egui::Stroke::new(3.0, egui::Color32::from_rgb(0xD9, 0x77, 0x06)),
+                );
+                ui.painter().text(
+                    r.center(),
+                    egui::Align2::CENTER_CENTER,
+                    if matches!(frage, Frage::Umbenennen { .. } | Frage::Update { .. }) { "i" } else { "!" },
+                    theme::ui_bold(32.0),
+                    egui::Color32::from_rgb(0x92, 0x40, 0x0E),
+                );
+                ui.add_space(10.0);
+                ui.label(RichText::new(titel).font(theme::ui_bold(30.0)));
+            });
+            ui.add_space(14.0);
+            ui.add(egui::Label::new(RichText::new(&text).font(theme::ui_font(21.0))).wrap());
+            if let Frage::Umbenennen { name, .. } = &frage {
+                ui.add_space(12.0);
+                let mut n = name.clone();
+                let feld = ui.add(egui::TextEdit::singleline(&mut n).font(theme::ui_font(22.0)).desired_width(560.0).margin(vec2(12.0, 10.0)));
+                if ui.memory(|m| m.focused().is_none()) {
+                    feld.request_focus();
+                }
+                if n != *name {
+                    neuer_name = Some(n);
+                }
+                if feld.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    gewaehlt = Some("Umbenennen");
                 }
             }
+            ui.add_space(20.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = vec2(14.0, 10.0);
+                for (i, k) in knoepfe.iter().enumerate() {
+                    if dialogknopf(ui, k, i) {
+                        gewaehlt = Some(k);
+                    }
+                }
+            });
+            if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                gewaehlt = Some(texte::ABBRECHEN);
+            }
         });
-        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-            gewaehlt = Some(texte::ABBRECHEN);
-        }
-    });
+    if let (Some(n), Some(Frage::Umbenennen { name, .. })) = (neuer_name, app.einfach.frage.as_mut()) {
+        *name = n;
+    }
     let Some(wahl) = gewaehlt.map(str::to_string) else {
         return;
     };
+    // Mit dem aktuellen Text antworten (beim Umbenennen der eingegebene Name).
+    let frage = app.einfach.frage.clone().unwrap_or(frage);
     app.einfach.frage = None;
     match frage {
         Frage::Ungespeichert { danach } => match wahl.as_str() {
@@ -905,6 +1318,12 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
         Frage::Update { .. } => {
             if wahl == "Jetzt aktualisieren" {
                 neu_oder_oeffnen(app, Danach::Aktualisieren);
+            }
+        }
+        Frage::Umbenennen { blatt, name } => {
+            let name = name.trim().to_string();
+            if wahl == "Umbenennen" && !name.is_empty() {
+                app.run_or_alert("sheet.rename", json!({"sheet": blatt, "name": name}));
             }
         }
         Frage::Wiederherstellen { .. } => {
@@ -1179,8 +1598,11 @@ mod tests {
     fn text_aus_anderem_programm_mit_tabulatoren() {
         let mut a = app();
         a.run_or_alert("selection.set", json!({"cell": "A1"}));
-        a.paste_external("1,5	Apfel
-2.000	3,25 €".into());
+        a.paste_external(
+            "1,5	Apfel
+2.000	3,25 €"
+                .into(),
+        );
         assert_eq!(wert(&mut a, "A1"), json!(1.5));
         assert_eq!(wert(&mut a, "B1"), json!("Apfel"));
         assert_eq!(wert(&mut a, "A2"), json!(2000.0));
@@ -1193,7 +1615,9 @@ mod tests {
         a.run_or_alert("cell.set", json!({"cell": "A1", "input": "12,5"}));
         let v = a.session.execute("cell.get", json!({"cell": "A1"})).unwrap_or_default();
         assert_eq!(v["text"], json!("12,5"));
-        let d = a.session.active().map(|d| simplegrid_engine::display::edit_text(&d.wb, d.wb.active().unwrap_or_else(|| unreachable!()), simplegrid_engine::core::CellRef::new(0, 0)));
+        let d = a.session.active().map(|d| {
+            simplegrid_engine::display::edit_text(&d.wb, d.wb.active().unwrap_or_else(|| unreachable!()), simplegrid_engine::core::CellRef::new(0, 0))
+        });
         assert_eq!(d.as_deref(), Some("12,5"));
     }
 
@@ -1378,7 +1802,8 @@ mod tests {
         a.run_or_alert("cell.set", json!({"cell": "A2", "input": "2"}));
         let deutsch = |a: &SheetApp, t: &str| {
             let d = a.session.active().unwrap_or_else(|| unreachable!());
-            crate::formula_locale::canonical(t, simplegrid_engine::formula::FormulaLocale::De, &d.wb, 0, simplegrid_engine::core::CellRef::new(0, 2)).unwrap_or_default()
+            crate::formula_locale::canonical(t, simplegrid_engine::formula::FormulaLocale::De, &d.wb, 0, simplegrid_engine::core::CellRef::new(0, 2))
+                .unwrap_or_default()
         };
         let f = deutsch(&a, "=SUMME(A1:A2;0,5)*2");
         assert_eq!(f, "=SUM(A1:A2,0.5)*2");

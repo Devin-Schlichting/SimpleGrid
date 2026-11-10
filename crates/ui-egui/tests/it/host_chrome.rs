@@ -21,9 +21,6 @@ fn harness(chrome: Chrome) -> egui_kittest::Harness<'static, SheetApp> {
     h
 }
 
-
-
-
 #[test]
 fn turning_the_file_tab_off_closes_an_open_backstage() {
     let mut h = harness(Chrome::default());

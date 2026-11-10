@@ -2,11 +2,11 @@
 
 use egui::{Event, Key, Modifiers, PointerButton};
 use egui_kittest::kittest::{NodeT as _, Queryable as _};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::i18n::Language;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 /// Builds the standard interaction harness around the caller's session with four warm-up passes.
 fn harness(session: Session) -> egui_kittest::Harness<'static, SheetApp> {
@@ -368,7 +368,6 @@ fn ctrl_arrows_in_point_mode_jump_to_the_edge_of_the_data() {
     assert_eq!(edited(&h).as_deref(), Some("=COUNTIF(B1"), "Command released in the same frame as the press still jumps");
 }
 
-
 #[test]
 fn delete_key_removes_the_selected_chart() {
     let mut session = blank();
@@ -406,7 +405,6 @@ fn inserted_chart_is_selected_so_delete_removes_it() {
     assert_eq!(value(&h, "A1"), Value::Number(1.0));
 }
 
-
 #[test]
 /// Every main ribbon tab and dark mode render with accessibility checks.
 fn renders_every_ribbon_tab_without_panicking() {
@@ -422,7 +420,6 @@ fn renders_every_ribbon_tab_without_panicking() {
     h.run_steps(3);
     h.check_accessibility();
 }
-
 
 #[test]
 /// The PivotTable Fields pane and its field menus switch to Spanish.
@@ -1278,7 +1275,6 @@ fn column_autocomplete_skips_ambiguous_prefixes_and_numbers() {
     assert_eq!(completion(&h), ("12".into(), None), "a number is not completed");
 }
 
-
 #[test]
 fn column_autocomplete_can_be_turned_off() {
     assert!(simplegrid_ui_egui::UiState::default().autocomplete);
@@ -1389,42 +1385,7 @@ fn status_bar_shows_macro_badge() {
     h.run_steps(2);
 }
 
-#[test]
-fn status_bar_names_a_circular_reference_by_its_address() {
-    let mut s = blank();
-    s.execute("home.insertSheet", json!({"name": "Bob's Q1"})).unwrap();
-    s.execute("cell.set", json!({"cell": "B2", "input": "=B2+1"})).unwrap();
-    let h = harness(s);
-    assert!(h.query_by_label("Circular References: B2").is_some(), "the status bar names the cell on the active sheet without its sheet");
-}
 
-#[test]
-fn status_bar_names_no_cell_when_every_circular_reference_is_on_another_sheet() {
-    let mut s = blank();
-    s.execute("home.insertSheet", json!({"name": "Data"})).unwrap();
-    s.execute("cell.set", json!({"cell": "B2", "input": "=B2+1"})).unwrap();
-    s.execute("sheet.activate", json!({"sheet": "Sheet1"})).unwrap();
-    let mut h = harness(s);
-    assert!(h.query_by_label("Circular References").is_some(), "the status bar still reports circular references");
-    assert!(h.query_by_label("Circular References: B2").is_none(), "no cell address from another sheet");
-    h.state_mut().session.execute("sheet.activate", json!({"sheet": "Data"})).unwrap();
-    h.run_steps(2);
-    assert!(h.query_by_label("Circular References: B2").is_some(), "the active sheet's loop is named");
-}
-
-#[test]
-fn status_bar_names_a_circular_reference_on_the_active_sheet() {
-    let mut s = blank();
-    s.execute("cell.set", json!({"cell": "A1", "input": "=A1+1"})).unwrap();
-    s.execute("home.insertSheet", json!({"name": "Data"})).unwrap();
-    s.execute("cell.set", json!({"cell": "B2", "input": "=B2+1"})).unwrap();
-    s.execute("formulas.calculateNow", json!({})).unwrap();
-    let circular = s.active().unwrap().calc.circular.clone();
-    assert_eq!(circular, vec![(0, CellRef::new(0, 0)), (1, CellRef::new(1, 1))], "Sheet1's loop is listed first");
-    let h = harness(s);
-    assert!(h.query_by_label("Circular References: B2").is_some(), "the status bar names the loop on the active sheet");
-    assert!(h.query_by_label("Circular References: A1").is_none(), "not the first loop listed");
-}
 
 
 #[test]

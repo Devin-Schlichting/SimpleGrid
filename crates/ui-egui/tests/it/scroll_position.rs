@@ -2,11 +2,11 @@
 //! Each window keeps each sheet's own scroll position while sheets are inserted, deleted or
 //! moved (#3485).
 
+use serde_json::json;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_engine::model::Workbook;
 use simplegrid_engine::{DocState, Session};
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

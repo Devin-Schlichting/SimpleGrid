@@ -8,9 +8,9 @@
 #![allow(dead_code)]
 
 use egui::{Key, Modifiers};
+use serde_json::{Value as Json, json};
 use simplegrid_engine::core::{CellRef, RangeRef};
 use simplegrid_engine::model::Sheet;
-use serde_json::{Value as Json, json};
 
 use crate::SheetApp;
 use crate::grid::Geo;

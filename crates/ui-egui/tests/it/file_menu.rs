@@ -29,7 +29,6 @@ fn page(h: &egui_kittest::Harness<'static, SheetApp>) -> Option<&'static str> {
     h.state().backstage.as_ref().map(|b| b.page.id())
 }
 
-
 /// Esc first cancels the focused File-page field, then closes File on the next press.
 #[test]
 fn escape_leaves_file_fields_before_closing_the_view() {
@@ -98,7 +97,6 @@ fn escape_leaves_file_fields_before_closing_the_view() {
     }
 }
 
-
 #[test]
 /// Options opens, named Backstage pages are reachable and accessible, an invalid page errors, and both close and Back leave Backstage.
 fn file_options_opens_the_options_page_and_pages_are_reachable_by_command() {
@@ -128,8 +126,6 @@ fn file_options_opens_the_options_page_and_pages_are_reachable_by_command() {
     assert!(h.state().backstage.is_none());
 }
 
-
-
 #[test]
 fn export_as_pdf_is_delivered_as_a_download() {
     let files = Arc::new(Mutex::new(Vec::<(String, Vec<u8>)>::new()));
@@ -144,7 +140,6 @@ fn export_as_pdf_is_delivered_as_a_download() {
     assert!(got[0].0.ends_with(".pdf"));
     assert!(got[0].1.starts_with(b"%PDF-"));
 }
-
 
 /// The window's close button (or Alt+F4, or the OS quitting the app): steps until the request
 /// has been handled and returns the viewport commands the app answered with.
@@ -168,9 +163,6 @@ fn click_commands(h: &mut egui_kittest::Harness<'static, SheetApp>, label: &str)
     step_commands(h)
 }
 
-
-
-
 /// Book1 has a cell being typed when File › New runs (the macOS menu runs the command directly).
 fn typing_in_book1_then_new(h: &mut egui_kittest::Harness<'static, SheetApp>) -> u64 {
     h.input_mut().events.push(egui::Event::Text("hello".into()));
@@ -185,7 +177,6 @@ fn typing_in_book1_then_new(h: &mut egui_kittest::Harness<'static, SheetApp>) ->
 fn a1(h: &egui_kittest::Harness<'static, SheetApp>, doc: usize) -> Value {
     h.state().session.documents()[doc].wb.active().unwrap().value(CellRef::new(0, 0))
 }
-
 
 #[test]
 fn a_draft_its_workbook_refuses_stops_the_switch_and_stays_open() {
@@ -210,7 +201,6 @@ fn a_draft_its_workbook_refuses_stops_the_switch_and_stays_open() {
     assert_eq!(h.state().session.doc().unwrap().uid, book1);
     assert!(h.state().message.is_none());
 }
-
 
 fn pdf_picker_harness(dir: &std::path::Path) -> (Arc<Mutex<Vec<String>>>, egui_kittest::Harness<'static, SheetApp>) {
     let asked = Arc::new(Mutex::new(Vec::<String>::new()));
@@ -411,7 +401,6 @@ fn save_a_copy_with_a_bare_name_asks_where_to_save_it() {
     assert_eq!(asked.lock().unwrap().len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
 }
-
 
 #[test]
 fn control_requests_route_to_a_window_and_list_windows() {

@@ -3,8 +3,8 @@
 use std::io::Cursor;
 
 use egui::{Shape, TextureId};
-use simplegrid_ui_egui::SheetApp;
 use serde_json::json;
+use simplegrid_ui_egui::SheetApp;
 
 fn png(color: [u8; 4]) -> Vec<u8> {
     let image = image::RgbaImage::from_pixel(120, 60, image::Rgba(color));

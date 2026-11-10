@@ -1,8 +1,8 @@
 //! Native print onboarding preserves engine PDF generation and submits the selected settings.
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::printing::{Duplex, Feedback, Printer};
 use simplegrid_ui_egui::{Services, SheetApp};
-use serde_json::json;
 use std::{cell::RefCell, rc::Rc};
 
 #[test]

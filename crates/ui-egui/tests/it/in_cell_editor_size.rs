@@ -1,10 +1,10 @@
 //! The in-cell editor covers the edited cell exactly, as in Excel, at every zoom (#1755).
 
 use egui::{Color32, Event, Modifiers, PointerButton, Rect, Shape};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

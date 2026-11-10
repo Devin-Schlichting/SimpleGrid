@@ -2,9 +2,9 @@
 //! a window stretched to the screen's height.
 
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 #[test]
 /// OK sits between 0 and 40 points below the last dialog option.

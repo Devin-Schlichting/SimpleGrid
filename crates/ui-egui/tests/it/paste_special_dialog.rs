@@ -1,9 +1,9 @@
 //! Paste Special: options in two columns, translated, OK pastes with them and Paste Link links.
 
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

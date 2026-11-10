@@ -1,10 +1,10 @@
 //! Ctrl+click on a hyperlink cell follows the link (#1198), like a plain click does.
 
 use egui::{Event, Modifiers, PointerButton, Pos2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

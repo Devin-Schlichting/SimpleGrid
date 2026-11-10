@@ -1,10 +1,10 @@
 //! Overflowing text stays visible in its empty neighbours when its own cell is scrolled out (#1613).
 
 use egui::{Rect, Shape};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -276,7 +276,6 @@ fn wrapped_text_in_tiny_row_has_no_partial_lines() {
 
     assert!(clip.height() <= 0.5, "no partial line should be visible: clip={clip:?}");
 }
-
 
 /// Issue #2544: text in a frozen column keeps its whole cell while the other columns scroll.
 #[test]

@@ -645,7 +645,9 @@ pub(super) fn form_fields(app: &SheetApp, ui: &mut egui::Ui, d: &mut Dialog) {
                         // SimpleGrid: Zahlen mit Dezimalkomma anzeigen und lesen.
                         if simplegrid_engine::core::locale::german() {
                             field = field
-                                .custom_formatter(|v, _| simplegrid_engine::core::locale::localize_number_text(&format!("{}", (v * 100.0).round() / 100.0)))
+                                .custom_formatter(|v, _| {
+                                    simplegrid_engine::core::locale::localize_number_text(&format!("{}", (v * 100.0).round() / 100.0))
+                                })
                                 .custom_parser(|t| t.trim().replace('.', "").replace(',', ".").parse::<f64>().ok());
                         }
                         let r = ui.add(field).labelled_by(label.id);

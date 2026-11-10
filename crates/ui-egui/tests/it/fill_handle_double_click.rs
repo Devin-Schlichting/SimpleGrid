@@ -2,10 +2,10 @@
 //! even with the pointer up for a frame between the two clicks.
 
 use egui::{Event, Modifiers, PointerButton, Pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 fn harness() -> egui_kittest::Harness<'static, SheetApp> {
     let mut session = Session::new();

@@ -2,10 +2,10 @@
 //! across its cell, and one too wide for its column shows #### instead of losing its leading digits.
 
 use egui::Shape;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

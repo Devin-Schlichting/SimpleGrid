@@ -1,11 +1,11 @@
 //! #2876: editing a stored hyperlink starts from its address, display text and ScreenTip.
 
 use egui_kittest::kittest::Queryable as _;
+use serde_json::{Value as Json, json};
 use simplegrid_engine::core::CellRef;
 use simplegrid_engine::model::{Cell, Hyperlink};
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::control::{Outcome, handle};
-use serde_json::{Value as Json, json};
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -48,7 +48,6 @@ fn existing_external_and_internal_links_prefill_their_fields() {
         assert!(h.query_by_label("ScreenTip:").is_some());
     }
 }
-
 
 /// Both the OK button and automation confirmation update one link and undo in one step.
 #[test]

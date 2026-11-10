@@ -5,10 +5,10 @@ use std::sync::{Arc, Mutex};
 
 use egui::{Rect, Shape, TextureId, vec2};
 use egui_kittest::kittest::Queryable;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::{Inbox, Services, SheetApp, grid::Geo};
-use serde_json::json;
 
 fn png() -> Vec<u8> {
     let image = image::RgbaImage::from_fn(120, 60, |x, _| {
@@ -60,7 +60,6 @@ fn image_meshes(h: &egui_kittest::Harness<'static, SheetApp>) -> Vec<(Rect, Rect
         })
         .collect()
 }
-
 
 #[test]
 fn pictures_fit_current_geometry_and_selection_cannot_erase_them() {

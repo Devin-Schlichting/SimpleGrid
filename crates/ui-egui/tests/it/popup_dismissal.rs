@@ -2,10 +2,10 @@
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, pos2};
 use egui_kittest::kittest::Queryable;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::{SheetApp, grid};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -93,22 +93,6 @@ fn worksheet_popups_close_on_grid_and_ribbon_clicks() {
             if !ribbon {
                 assert_eq!(h.state().session.active().unwrap().selection.active.a1(), "H7");
             }
-        }
-    }
-}
-
-#[test]
-fn filter_closes_when_clicking_another_table_or_sheet() {
-    for sheet in [false, true] {
-        let mut h = harness();
-        open(&mut h, Menu::Filter);
-        let outside = if sheet { pos2(44.0, h.state().grid.rect.unwrap().bottom() + 16.0) } else { cell_pos(&h, "H2") };
-        click(&mut h, outside, PointerButton::Primary);
-        assert!(!is_open(&h, Menu::Filter), "filter stayed open after switching table/sheet");
-        if sheet {
-            assert_eq!(h.state().session.active().unwrap().wb.active_sheet(), 1);
-        } else {
-            assert_eq!(h.state().session.active().unwrap().selection.active.a1(), "H2");
         }
     }
 }

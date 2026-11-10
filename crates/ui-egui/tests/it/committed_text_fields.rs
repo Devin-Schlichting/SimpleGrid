@@ -2,9 +2,9 @@
 
 use egui::{Event, Key, Modifiers, accesskit::Role};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -55,4 +55,3 @@ fn typing_a_chart_title_in_format_chart_area_sets_it() {
     let title = h.state().session.active().unwrap().wb.active().unwrap().charts.iter().find(|c| c.id == id).unwrap().title.clone();
     assert_eq!(title.as_deref(), Some("Sales"));
 }
-

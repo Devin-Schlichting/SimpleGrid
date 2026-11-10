@@ -3,17 +3,15 @@
 use egui::os::OperatingSystem;
 use egui::{Event, Key, Modifiers};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 fn press(h: &mut egui_kittest::Harness<'static, SheetApp>, key: Key) {
     let ev = |pressed| Event::Key { key, physical_key: None, pressed, repeat: false, modifiers: Modifiers::NONE };
     h.input_mut().events.extend([ev(true), Event::Text(key.name().to_ascii_lowercase()), ev(false)]);
     h.run_steps(2);
 }
-
-
 
 #[test]
 fn a_waiting_key_tip_request_stays_with_its_window() {

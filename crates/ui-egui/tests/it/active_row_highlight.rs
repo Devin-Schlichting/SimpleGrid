@@ -2,11 +2,11 @@
 //! row of the active cell and leaves the workbook alone.
 
 use egui::{Shape, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::theme::Tokens;
 use simplegrid_ui_egui::{SheetApp, UiState, grid::Geo, grid::active_row_band};
-use serde_json::json;
 
 fn harness(session: Session) -> egui_kittest::Harness<'static, SheetApp> {
     let mut h = crate::common::builder().with_size(vec2(1200.0, 800.0)).build_ui_state(

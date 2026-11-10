@@ -58,7 +58,9 @@ impl Fehler {
         match self {
             Fehler::KeinNetz(_) | Fehler::Limit => "Die Update-Suche hat gerade keine Verbindung. Bitte später noch einmal versuchen.",
             Fehler::Unbrauchbar(_) => "Die Update-Informationen sind nicht lesbar. Bitte später noch einmal versuchen.",
-            Fehler::Pruefsumme => "Das heruntergeladene Update ist beschädigt und wurde nicht installiert. Ihre bisherige Version bleibt unverändert.",
+            Fehler::Pruefsumme => {
+                "Das heruntergeladene Update ist beschädigt und wurde nicht installiert. Ihre bisherige Version bleibt unverändert."
+            }
         }
     }
 }
@@ -127,7 +129,18 @@ pub struct GithubQuelle {
 /// Holt eine Adresse mit dem in Windows enthaltenen `curl.exe` (ohne Konsolenfenster).
 fn holen(url: &str) -> Result<Vec<u8>, Fehler> {
     let mut cmd = std::process::Command::new("curl.exe");
-    cmd.args(["-sSL", "--max-time", "60", "-H", "User-Agent: SimpleGrid-Update", "-H", "Accept: application/vnd.github+json", "-w", "\n%{http_code}", url]);
+    cmd.args([
+        "-sSL",
+        "--max-time",
+        "60",
+        "-H",
+        "User-Agent: SimpleGrid-Update",
+        "-H",
+        "Accept: application/vnd.github+json",
+        "-w",
+        "\n%{http_code}",
+        url,
+    ]);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -165,7 +178,12 @@ pub fn release_aus(release_json: &[u8], versionen_json: &[u8]) -> Result<Release
     let gh: GhRelease = serde_json::from_slice(release_json).map_err(|e| Fehler::Unbrauchbar(e.to_string()))?;
     let v: Versionen = serde_json::from_slice(versionen_json).map_err(|e| Fehler::Unbrauchbar(e.to_string()))?;
     let version = v.apps.get(APP).cloned().ok_or_else(|| Fehler::Unbrauchbar("SimpleGrid fehlt in versionen.json".into()))?;
-    let url = gh.assets.iter().find(|a| a.name == v.installer).map(|a| a.browser_download_url.clone()).ok_or_else(|| Fehler::Unbrauchbar("Installer fehlt".into()))?;
+    let url = gh
+        .assets
+        .iter()
+        .find(|a| a.name == v.installer)
+        .map(|a| a.browser_download_url.clone())
+        .ok_or_else(|| Fehler::Unbrauchbar("Installer fehlt".into()))?;
     Ok(Release { version, installer_url: url, sha256: v.sha256 })
 }
 
@@ -177,7 +195,12 @@ impl UpdateQuelle for GithubQuelle {
         }
         let release = holen(&format!("https://api.github.com/repos/{repo}/releases/latest"))?;
         let gh: GhRelease = serde_json::from_slice(&release).map_err(|e| Fehler::Unbrauchbar(e.to_string()))?;
-        let url = gh.assets.iter().find(|a| a.name == "versionen.json").map(|a| a.browser_download_url.clone()).ok_or_else(|| Fehler::Unbrauchbar("versionen.json fehlt".into()))?;
+        let url = gh
+            .assets
+            .iter()
+            .find(|a| a.name == "versionen.json")
+            .map(|a| a.browser_download_url.clone())
+            .ok_or_else(|| Fehler::Unbrauchbar("versionen.json fehlt".into()))?;
         let versionen = holen(&url)?;
         release_aus(&release, &versionen)
     }
@@ -256,7 +279,10 @@ mod tests {
     fn github_antwort_und_versionen_json() {
         let gh = br#"{"tag_name":"v1.3.0","assets":[{"name":"versionen.json","browser_download_url":"https://x/versionen.json"},{"name":"SimpleGrid-Setup.exe","browser_download_url":"https://x/SimpleGrid-Setup.exe"}]}"#;
         let v = br#"{"apps":{"SimpleGrid":"1.3.0"},"installer":"SimpleGrid-Setup.exe","sha256":"abc"}"#;
-        assert_eq!(release_aus(gh, v), Ok(Release { version: "1.3.0".into(), installer_url: "https://x/SimpleGrid-Setup.exe".into(), sha256: "abc".into() }));
+        assert_eq!(
+            release_aus(gh, v),
+            Ok(Release { version: "1.3.0".into(), installer_url: "https://x/SimpleGrid-Setup.exe".into(), sha256: "abc".into() })
+        );
         assert!(release_aus(gh, b"{}").is_err());
         assert!(matches!(GithubQuelle { repo: "kein repo; rm -rf".into() }.neueste(), Err(Fehler::Unbrauchbar(_))));
     }

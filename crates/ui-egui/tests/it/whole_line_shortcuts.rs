@@ -2,10 +2,10 @@
 //! any other selection opens the Insert or Delete dialog.
 
 use egui::{Key, Modifiers};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -36,13 +36,9 @@ fn press(h: &mut Harness, key: Key, shift: bool) {
     h.run_steps(3);
 }
 
-
-
-
 #[test]
 fn unshifted_equals_inserts_nothing() {
     let mut h = harness("2:2");
     press(&mut h, Key::Equals, false);
     assert_eq!(value(&h, "A2"), Value::from("a2"));
 }
-

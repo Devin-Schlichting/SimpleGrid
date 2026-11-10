@@ -2,12 +2,12 @@
 //! each of the eight handles, deleting with Delete and Backspace, and double-click routing.
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_engine::model::{ObjKind, ObjRef};
 use simplegrid_ui_egui::objects::{Handle, OpenAction, open_action};
 use simplegrid_ui_egui::{SheetApp, chartview, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -214,7 +214,6 @@ fn a_click_selects_every_kind_and_slicers_win_over_charts() {
     assert_eq!(h.state().selected_object, None, "a click on the cells clears the object selection");
     assert_eq!(kept(&h), Value::text("keep me"));
 }
-
 
 #[test]
 fn handles_show_resize_cursors_and_the_body_a_move_cursor() {

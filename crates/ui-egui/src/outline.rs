@@ -9,10 +9,10 @@
 //! (`data.hideDetail`, `data.showDetail`, `data.showLevels`), so they undo like any edit.
 
 use egui::{Align2, Painter, Pos2, Rect, Stroke, StrokeKind, pos2, vec2};
+use serde_json::{Value as Json, json};
 use simplegrid_engine::core::col_to_letters;
 use simplegrid_engine::model::{LineInfo, Sheet};
 use simplegrid_engine::outline::{self, OutlineGroup};
-use serde_json::{Value as Json, json};
 use std::collections::BTreeMap;
 
 use crate::grid::{DISPLAY_SCALE, Geo};

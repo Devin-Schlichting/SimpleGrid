@@ -2,9 +2,9 @@
 //! into the formula box at its caret, as in Excel, and leaves the selection the rule applies to alone.
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

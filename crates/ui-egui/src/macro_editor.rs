@@ -19,11 +19,11 @@
 use std::collections::BTreeMap;
 
 use egui::{Color32, Id, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
+use serde_json::{Map, Value as Json, json};
 use simplegrid_engine::core::RangeRef;
 use simplegrid_engine::macros::policy::{Policy, macro_policy};
 use simplegrid_engine::macros::resolve::{self, Env, Place};
 use simplegrid_engine::model::{ColType, CompareOp, InputKind, Macro, NamedInput, OnConflict, RepeatOf, Step, StepKind, Workbook};
-use serde_json::{Map, Value as Json, json};
 
 use crate::dialogs::Dialog;
 use crate::icons::{self, Icon};

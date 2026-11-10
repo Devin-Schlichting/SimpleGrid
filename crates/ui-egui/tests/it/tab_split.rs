@@ -1,9 +1,9 @@
 //! The handle between the sheet tabs and the horizontal scrollbar: dragging it gives the tabs more
 //! or less of the tab bar, as in Excel.
 use egui::{Event, Modifiers, PointerButton, Pos2, Rect, Shape, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

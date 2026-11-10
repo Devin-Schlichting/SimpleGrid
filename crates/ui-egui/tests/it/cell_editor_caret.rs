@@ -1,8 +1,8 @@
 //! The caret of the in-cell editor stays visible on the cell's fill, whatever the theme.
 use egui::{Color32, Context, RawInput, Rect, Shape, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::{SheetApp, theme};
-use serde_json::json;
 
 fn frame(ctx: &Context, app: &mut SheetApp) -> egui::FullOutput {
     let mut output =

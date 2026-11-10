@@ -1,8 +1,8 @@
 use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::model::{ObjKind, ObjRef};
-use serde_json::json;
 
 #[test]
 fn format_chart_pane_controls_the_engine_data_table() {

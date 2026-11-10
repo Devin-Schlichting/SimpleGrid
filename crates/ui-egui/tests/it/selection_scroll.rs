@@ -2,11 +2,11 @@
 //! Go To and Select over the control channel scroll the active cell into view.
 
 use egui::{Event, Key, Modifiers};
+use serde_json::{Value as Json, json};
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, RangeRef};
 use simplegrid_ui_egui::control::{Outcome, handle};
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::{Value as Json, json};
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -59,7 +59,6 @@ fn assert_extended(h: &Harness, anchor: &str, moving_end: &str) {
     assert!(visible(h, moving_end), "the moving end {moving_end} is scrolled into view");
 }
 
-
 #[test]
 fn shift_arrows_scroll_the_moving_end_into_view() {
     let mut h = harness();
@@ -72,7 +71,6 @@ fn shift_arrows_scroll_the_moving_end_into_view() {
     }
     assert_extended(&h, "A1", "AE61");
 }
-
 
 fn control(h: &mut Harness, method: &str, params: Json) -> Json {
     let ctx = h.ctx.clone();
@@ -130,11 +128,6 @@ fn page_down_and_back_up_from_row_10_shows_rows_2_to_9_again() {
     assert!(visible(&h, "A2") && visible(&h, "A9"));
 }
 
-
-
-
-
-
 #[test]
 fn other_reveals_onto_a_frozen_cell_leave_the_scrolled_rows_where_they_are() {
     // Only arrow and paging keys bring the scrolled rows back; selecting a header cell from the
@@ -147,7 +140,6 @@ fn other_reveals_onto_a_frozen_cell_leave_the_scrolled_rows_where_they_are() {
     assert_eq!(active(&h), CellRef::parse("B1").unwrap());
     assert_eq!(scroll(&h).y, down);
 }
-
 
 #[test]
 fn down_from_a_frozen_header_row_goes_to_row_2_at_the_top_from_far_down() {
@@ -212,5 +204,3 @@ fn shift_arrows_on_a_whole_row_leave_the_columns_where_they_are() {
     assert!(visible(&h, "CA62") && !visible(&h, "CA1"));
     assert_eq!(scroll(&h).x, right);
 }
-
-

@@ -1,10 +1,10 @@
 //! Ctrl+[ / Ctrl+] select precedent and dependent cells (#1865).
 
 use egui::{Event, Key, Modifiers};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -38,9 +38,6 @@ fn chain() -> Session {
     s
 }
 
-
-
-
 #[test]
 fn no_precedents_leaves_selection_untouched() {
     let mut h = harness(chain());
@@ -48,4 +45,3 @@ fn no_precedents_leaves_selection_untouched() {
     key(&mut h, Key::OpenBracket, Modifiers::CTRL);
     assert_eq!(active(&h), "A1", "a plain entry cell has no precedents to select");
 }
-

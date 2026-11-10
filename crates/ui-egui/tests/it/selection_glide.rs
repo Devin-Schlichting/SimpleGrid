@@ -2,11 +2,11 @@
 
 use egui::Rect;
 use egui_kittest::kittest::Queryable;
+use serde_json::{Value, json};
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::control::{self, Outcome};
 use simplegrid_ui_egui::{ControlRequest, SheetApp, UiState, grid::Geo};
-use serde_json::{Value, json};
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -116,7 +116,6 @@ fn with_eguis_animations_off_the_outline_is_always_on_its_cells() {
         assert!(!gliding(&h));
     }
 }
-
 
 #[test]
 fn a_screenshot_never_catches_the_outline_in_flight() {

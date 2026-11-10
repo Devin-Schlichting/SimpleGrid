@@ -2,10 +2,10 @@
 //! Outline Settings dialog that moves the summary rows above their detail.
 
 use egui::{Event, Modifiers, PointerButton, Pos2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::outline::{Action, layout};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

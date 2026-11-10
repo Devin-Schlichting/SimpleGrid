@@ -1,10 +1,10 @@
 //! Sheet Right-to-Left: the grid is mirrored on screen and pointer/keyboard input follows it.
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, RangeRef};
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

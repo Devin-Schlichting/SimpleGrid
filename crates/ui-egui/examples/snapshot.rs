@@ -7,9 +7,9 @@
 //! `--refedit key=range` collapses the open dialog to its reference box `key`, then selects
 //! `range` on the grid, as a person picking a range for that box does.
 
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -21,6 +21,8 @@ fn main() {
     let mut tab = None;
     let mut dark = false;
     let mut seitenansicht = false;
+    let mut register: Option<String> = None;
+    let mut frage: Option<String> = None;
     let mut pane: Option<String> = None;
     let mut chart: Option<u32> = None;
     let mut dialog: Option<String> = None;
@@ -62,6 +64,15 @@ fn main() {
             "--dark" => dark = true,
             // SimpleGrid: die Seitenansicht (Druckvorschau) zeigen.
             "--seitenansicht" => seitenansicht = true,
+            // SimpleGrid: Register der Leiste (0–5) bzw. eine Rückfrage zeigen.
+            "--register" => {
+                i += 1;
+                register = args.get(i).cloned();
+            }
+            "--frage" => {
+                i += 1;
+                frage = args.get(i).cloned();
+            }
             "--pane" => {
                 i += 1;
                 pane = args.get(i).cloned();
@@ -122,6 +133,19 @@ fn main() {
                 app.ui.dark = dark;
                 if seitenansicht {
                     simplegrid_ui_egui::seitenansicht::oeffnen(&mut app);
+                }
+                if let Some(n) = register.as_deref().and_then(|r| r.parse::<usize>().ok()) {
+                    app.einfach.register = simplegrid_ui_egui::einfach::Register::ALLE.get(n).copied().unwrap_or_default();
+                }
+                match frage.as_deref() {
+                    Some("speichern") => {
+                        app.einfach.frage =
+                            Some(simplegrid_ui_egui::einfach::Frage::Ungespeichert { danach: simplegrid_ui_egui::einfach::Danach::Beenden })
+                    }
+                    Some("umbenennen") => {
+                        app.einfach.frage = Some(simplegrid_ui_egui::einfach::Frage::Umbenennen { blatt: 0, name: "Tabelle1".into() })
+                    }
+                    _ => {}
                 }
                 if let Some(code) = &language
                     && let Some(l) = simplegrid_ui_egui::i18n::Language::parse(code)

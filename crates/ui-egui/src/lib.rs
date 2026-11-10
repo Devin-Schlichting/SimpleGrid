@@ -6,7 +6,6 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
-
 pub mod backstage;
 mod border_preview;
 mod cell_pictures;
@@ -44,13 +43,13 @@ pub mod pivot_pane;
 pub mod printing;
 pub mod ribbon;
 pub mod seitenansicht;
-pub mod sicherung;
-pub mod update;
 pub mod selection_glide;
+pub mod sicherung;
 pub mod tabs;
 pub mod text_box;
 mod text_direction;
 pub mod theme;
+pub mod update;
 #[cfg(not(target_arch = "wasm32"))]
 mod updates_ui;
 pub mod widgets;
@@ -60,10 +59,10 @@ pub use window_ui::WindowUi;
 
 use std::collections::HashMap;
 
-use simplegrid_engine::core::{CellRef, RangeRef};
-use simplegrid_engine::{Session, UiRequest};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value as Json, json};
+use simplegrid_engine::core::{CellRef, RangeRef};
+use simplegrid_engine::{Session, UiRequest};
 
 pub use control::{ControlRequest, ControlResponse};
 

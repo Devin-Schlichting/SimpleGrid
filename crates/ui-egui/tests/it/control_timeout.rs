@@ -1,9 +1,9 @@
 //! A control request whose sender stopped waiting is dropped unrun (#1914).
 
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::{ControlRequest, SheetApp};
-use serde_json::json;
 
 fn app() -> (SheetApp, egui::Context) {
     let mut s = Session::new();

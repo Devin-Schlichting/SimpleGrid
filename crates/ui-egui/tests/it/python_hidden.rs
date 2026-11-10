@@ -5,9 +5,9 @@
 
 use egui::{Event, Key, Modifiers, vec2};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
-use serde_json::json;
 
 use crate::common::Harness;
 
@@ -118,4 +118,3 @@ fn python_mode_starts_no_edit_on_hidden_code() {
     press(&mut h, Key::Enter, Modifiers::COMMAND);
     assert_eq!(stored_code(&h).as_deref(), Some(CODE));
 }
-

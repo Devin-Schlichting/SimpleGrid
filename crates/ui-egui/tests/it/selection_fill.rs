@@ -1,10 +1,10 @@
 //! The selection's fill leaves the active cell clear, so it is plain where typing goes.
 
 use egui::Rect;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::RangeRef;
 use simplegrid_ui_egui::grid::{Geo, selection_fill};
-use serde_json::json;
 
 fn session() -> Session {
     let mut session = Session::new();

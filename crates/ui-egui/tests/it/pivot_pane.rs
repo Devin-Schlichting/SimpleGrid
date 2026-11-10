@@ -1,9 +1,9 @@
 //! Pivot field buttons use the surface color for the active theme.
 
 use egui::{Color32, RawInput, Rect, Shape, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::theme;
-use serde_json::json;
 
 /// Builds a pivot report at D3 and returns the painted shapes after six frames in the caller's light or dark mode.
 fn render_pivot_field_buttons(dark: bool) -> Vec<Shape> {

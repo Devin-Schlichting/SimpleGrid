@@ -5,10 +5,10 @@
 //! commands.
 
 use egui::{Pos2, Rect, Stroke, StrokeKind, Ui, vec2};
+use serde_json::{Value as Json, json};
 use simplegrid_engine::core::CellRef;
 use simplegrid_engine::macros::policy::{Policy, macro_policy};
 use simplegrid_engine::model::{CONTROL_MAX, ControlAction, ControlKind, FormControl, MacroInput, ObjKind, ObjRef, Sheet};
-use serde_json::{Value as Json, json};
 
 use crate::SheetApp;
 use crate::dialogs::Dialog;

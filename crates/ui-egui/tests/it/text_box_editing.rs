@@ -1,11 +1,11 @@
 //! Text-box editing through real pointer and keyboard input, including document boundaries.
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::{CellRef, Value};
 use simplegrid_engine::model::{Shape, Workbook};
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 

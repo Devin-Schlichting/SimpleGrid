@@ -20,8 +20,8 @@
 use std::sync::mpsc::Sender;
 
 use craft_ui::capture::CaptureSlot;
-use simplegrid_engine::core::CellRef;
 use serde_json::{Value as Json, json};
+use simplegrid_engine::core::CellRef;
 
 use crate::SheetApp;
 

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 452" role="img" aria-labelledby="title"><title id="title">SimpleGrid master symbol</title><defs><linearGradient id="sg-green" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#18C58A"/><stop offset="1" stop-color="#078653"/></linearGradient></defs>
+<g id="simplegrid-symbol">
+ <path d="M105 38 H335 Q352 38 365 51 L439 125 Q452 138 452 156 V390 Q452 414 428 414 H105 Q81 414 81 390 V62 Q81 38 105 38 Z" fill="url(#sg-green)"/>
+ <path d="M335 38 V106 Q335 125 354 125 H452 Z" fill="#6EE7B7"/>
+ <path d="M335 38 L452 156" fill="none" stroke="#087F52" stroke-width="3" opacity=".38"/>
+ <g fill="#FFFFFF">
+  <rect x="139" y="166" width="78" height="52" rx="3"/><rect x="229" y="166" width="78" height="52" rx="3"/><rect x="319" y="166" width="78" height="52" rx="3"/>
+  <rect x="139" y="230" width="78" height="52" rx="3"/><rect x="229" y="230" width="78" height="52" rx="3"/><rect x="319" y="230" width="78" height="52" rx="3"/>
+  <rect x="139" y="294" width="78" height="52" rx="3"/><rect x="229" y="294" width="78" height="52" rx="3"/><rect x="319" y="294" width="78" height="52" rx="3"/>
+ </g>
+</g>
+</svg>

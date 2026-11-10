@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use egui::{Align2, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
-use simplegrid_engine::model::{Sheet, Visibility};
 use serde_json::json;
+use simplegrid_engine::model::{Sheet, Visibility};
 
 use crate::SheetApp;
 use crate::icons::{self, Icon};
@@ -566,8 +566,8 @@ mod tests {
     };
     use crate::SheetApp;
     use egui::Modifiers;
-    use simplegrid_engine::model::{Sheet, Visibility};
     use serde_json::json;
+    use simplegrid_engine::model::{Sheet, Visibility};
     use std::sync::Arc;
 
     fn workbook_abc() -> SheetApp {

@@ -1,10 +1,10 @@
 //! The Zoom dialog stores the Magnification the user picks.
 
 use egui_kittest::kittest::Queryable;
+use serde_json::{Value as Json, json};
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::control::{Outcome, handle};
-use serde_json::{Value as Json, json};
 
 fn harness() -> egui_kittest::Harness<'static, SheetApp> {
     crate::support::blank_harness(6)

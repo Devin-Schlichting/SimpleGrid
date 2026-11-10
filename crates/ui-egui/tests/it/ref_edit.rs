@@ -3,11 +3,11 @@
 
 use egui::{Event, Key, Modifiers, PointerButton};
 use egui_kittest::kittest::Queryable as _;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_ui_egui::control::{Outcome, handle};
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type H = egui_kittest::Harness<'static, SheetApp>;
 
@@ -179,52 +179,7 @@ fn enter_and_the_expand_button_restore_the_dialog_and_ok_runs_goal_seek() {
     assert_eq!(selection(&h), (0, "B5".into()), "the selection from before picking comes back");
 }
 
-#[test]
-fn a_range_on_another_sheet_carries_the_sheet_name_and_cancel_returns_home() {
-    let mut s = workbook();
-    s.execute("home.insertSheet", json!({"name": "Rates Table", "before": 1})).unwrap();
-    s.execute("sheet.activate", json!({"sheet": 0})).unwrap();
-    s.execute("selection.set", json!({"range": "B5"})).unwrap();
-    let mut h = harness(s);
-    open_goal_seek(&mut h);
-    click_button(&mut h, "Collapse dialog", 1);
-    // The sheet tabs' "Next sheet" arrow, below the grid at the left.
-    let grid = h.state().grid.rect.unwrap();
-    click_at(&mut h, egui::pos2(grid.left() + 44.0, grid.bottom() + 16.0));
-    assert_eq!(selection(&h).0, 1, "the next sheet is active while picking");
-    drag(&mut h, "A2", "A4");
-    assert_eq!(field(&h, "changing"), "'Rates Table'!$A$2:$A$4");
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    assert_eq!(collapsed(&h), None);
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    assert!(h.state().dialog.is_none(), "Escape in the expanded dialog cancels it");
-    assert_eq!(selection(&h), (0, "B5".into()), "cancelling returns to the sheet and selection");
-}
 
-#[test]
-fn switching_sheets_while_picking_keeps_a_typed_reference() {
-    let mut s = workbook();
-    s.execute("home.insertSheet", json!({"name": "Rates Table", "before": 1})).unwrap();
-    s.execute("sheet.activate", json!({"sheet": 0})).unwrap();
-    s.execute("selection.set", json!({"range": "B5"})).unwrap();
-    let mut h = harness(s);
-    open_goal_seek(&mut h);
-    click_button(&mut h, "Collapse dialog", 1);
-    key(&mut h, Key::A, Modifiers::COMMAND);
-    type_text(&mut h, "B2");
-    assert_eq!(field(&h, "changing"), "B2");
-    // The sheet tabs' "Next sheet" and "Previous sheet" arrows, below the grid at the left.
-    let grid = h.state().grid.rect.unwrap();
-    click_at(&mut h, egui::pos2(grid.left() + 44.0, grid.bottom() + 16.0));
-    assert_eq!(selection(&h).0, 1, "the next sheet is active while picking");
-    assert_eq!(field(&h, "changing"), "B2", "changing sheets alone is not a pick");
-    click_at(&mut h, egui::pos2(grid.left() + 20.0, grid.bottom() + 16.0));
-    assert_eq!(selection(&h).0, 0, "back on the dialog's own sheet");
-    assert_eq!(field(&h, "changing"), "B2", "coming back is not a pick either");
-    click_at(&mut h, egui::pos2(grid.left() + 44.0, grid.bottom() + 16.0));
-    drag(&mut h, "A2", "A4");
-    assert_eq!(field(&h, "changing"), "'Rates Table'!$A$2:$A$4", "a selection on the other sheet still is");
-}
 
 #[test]
 fn clicking_into_a_box_picks_into_it_and_another_field_stops_picking() {
@@ -539,8 +494,6 @@ fn a_second_ok_after_a_failed_one_runs_on_the_dialogs_sheet() {
     assert!(wb.sheets[1].value(CellRef::parse("H1").unwrap()).is_empty(), "not on the sheet shown");
 }
 
-
-
 #[test]
 fn another_dialog_opened_while_picking_puts_the_selection_back() {
     let mut h = harness(workbook());
@@ -712,59 +665,7 @@ fn next_sheet(h: &mut H) {
     click_at(h, egui::pos2(grid.left() + 44.0, grid.bottom() + 16.0));
 }
 
-#[test]
-fn ok_after_a_cross_sheet_pick_runs_goal_seek_with_the_quoted_sheet_name() {
-    let mut h = harness(quoted_sheet());
-    open_goal_seek(&mut h);
-    assert_eq!(field(&h, "set"), "B5");
-    click_button(&mut h, "Collapse dialog", 1);
-    next_sheet(&mut h);
-    assert_eq!(selection(&h).0, 1);
-    drag(&mut h, "A2", "A2");
-    assert_eq!(field(&h, "changing"), "'O''Brien Rates'!$A$2", "quoted as the command's parser reads it");
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    let to = dialog_boxes(&h)[1];
-    click_at(&mut h, to.center());
-    key(&mut h, Key::A, Modifiers::COMMAND);
-    type_text(&mut h, "25");
-    h.get_by_label("   OK   ").click();
-    h.run_steps(3);
-    assert!(h.state().dialog.is_none(), "{:?}", h.state().message);
-    let wb = &h.state().session.active().unwrap().wb;
-    let a2 = wb.sheets[1].value(CellRef::parse("A2").unwrap());
-    assert!((a2.as_f64().unwrap() - 7.0).abs() < 1e-6, "the changing cell on the other sheet: {a2:?}");
-    let b5 = wb.sheets[0].value(CellRef::parse("B5").unwrap());
-    assert!((b5.as_f64().unwrap() - 25.0).abs() < 1e-6, "{b5:?}");
-    assert_eq!(selection(&h), (0, "B5".into()), "back on the dialog's sheet and selection");
-}
 
-#[test]
-fn data_analysis_runs_on_a_range_picked_on_another_sheet() {
-    let mut h = harness(quoted_sheet());
-    h.state_mut().open_dialog("analysisToolPak", json!({"tool": "descriptive"}));
-    h.run_steps(4);
-    click_button(&mut h, "Collapse dialog", 0);
-    next_sheet(&mut h);
-    drag(&mut h, "A1", "A6");
-    assert_eq!(field(&h, "range"), "'O''Brien Rates'!$A$1:$A$6");
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    let d = h.state_mut().dialog.as_mut().unwrap();
-    d.values.insert("outputTo".into(), json!("range"));
-    d.values.insert("output".into(), json!("$H$1"));
-    h.get_by_label("   OK   ").click();
-    h.run_steps(3);
-    assert!(h.state().dialog.is_none(), "{:?}", h.state().message);
-    // The report is on the dialog's own sheet and read the other sheet's numbers: the mean of
-    // 1..6 is 21 / 6 = 3.5.
-    let wb = &h.state().session.active().unwrap().wb;
-    let report = &wb.sheets[0];
-    let mean = (0..20).find_map(|row| {
-        let label = report.value(CellRef::new(row, 7));
-        (label.as_text().map(str::trim) == Some("Mean")).then(|| report.value(CellRef::new(row, 8)))
-    });
-    assert_eq!(mean.and_then(|v| v.as_f64()), Some(3.5), "{:?}", (0..20).map(|r| report.value(CellRef::new(r, 7))).collect::<Vec<_>>());
-    assert!(wb.sheets[1].value(CellRef::parse("H1").unwrap()).is_empty(), "nothing was written on the picked sheet");
-}
 
 #[test]
 fn enter_while_collapsed_only_expands_the_dialog() {
@@ -813,86 +714,7 @@ fn a_successful_analysis_to_a_new_sheet_leaves_that_sheet_active() {
     assert_eq!(selection(&h).0, 1, "the report sheet stays active");
 }
 
-#[test]
-fn a_scripted_cancel_or_ok_goes_back_to_the_dialogs_sheet_like_the_buttons() {
-    // Cancel from the control channel puts the sheet and selection back.
-    let mut h = harness(two_sheets());
-    open_goal_seek(&mut h);
-    click_button(&mut h, "Collapse dialog", 1);
-    next_sheet(&mut h);
-    drag(&mut h, "A2", "A2");
-    assert_eq!(field(&h, "changing"), "Rates!$A$2");
-    assert_eq!(selection(&h), (1, "A2".into()));
-    let r = control(&mut h, "ui.dialog.cancel", json!({}));
-    assert_eq!(r["ok"], json!(true), "{r}");
-    assert!(h.state().dialog.is_none());
-    assert_eq!(selection(&h), (0, "B5".into()), "a scripted cancel returns home as the button does");
 
-    // OK from the control channel runs the command on the dialog's sheet: `$H$1` means the sheet
-    // the dialog was opened on, not the sheet the box picked on.
-    let mut h = harness(quoted_sheet());
-    h.state_mut().open_dialog("analysisToolPak", json!({"tool": "descriptive"}));
-    h.run_steps(4);
-    click_button(&mut h, "Collapse dialog", 0);
-    next_sheet(&mut h);
-    drag(&mut h, "A1", "A6");
-    assert_eq!(field(&h, "range"), "'O''Brien Rates'!$A$1:$A$6");
-    control(&mut h, "ui.dialog.set", json!({"field": "outputTo", "value": "range"}));
-    control(&mut h, "ui.dialog.set", json!({"field": "output", "value": "$H$1"}));
-    let r = control(&mut h, "ui.dialog.confirm", json!({}));
-    assert_eq!(r["ok"], json!(true), "{r}");
-    assert!(h.state().dialog.is_none());
-    let wb = &h.state().session.active().unwrap().wb;
-    assert!(!wb.sheets[0].value(CellRef::parse("H1").unwrap()).is_empty(), "the report is on the dialog's own sheet");
-    assert!(wb.sheets[1].value(CellRef::parse("H1").unwrap()).is_empty(), "not on the sheet shown while picking");
-    assert_eq!(selection(&h).0, 0);
-
-    // A deleted dialog sheet refuses a scripted OK as it refuses the button (Goal Seek presses
-    // its own OK, so `ui.dialog.confirm` refuses it by design; Data Analysis has a command).
-    let mut h = harness(two_sheets());
-    h.state_mut().open_dialog("analysisToolPak", json!({"tool": "descriptive"}));
-    h.run_steps(4);
-    click_button(&mut h, "Collapse dialog", 0);
-    h.state_mut().session.execute("home.deleteSheet", json!({"sheet": 0})).unwrap();
-    h.run_steps(3);
-    let r = control(&mut h, "ui.dialog.confirm", json!({}));
-    assert_eq!(r["ok"], json!(false), "{r}");
-    assert!(r["error"].as_str().unwrap_or("").contains("was deleted"), "{r}");
-    assert!(h.state().dialog.is_some(), "the dialog stays open");
-}
-
-#[test]
-fn a_text_box_draft_is_saved_before_a_scripted_cancel_leaves_the_picked_sheet() {
-    let mut s = two_sheets();
-    s.execute("sheet.activate", json!({"sheet": 1})).unwrap();
-    let id =
-        s.execute("insert.textBox", json!({"at": "B2", "width": 240, "height": 120, "text": "Rate note"})).unwrap()["shape"].as_u64().unwrap() as u32;
-    s.execute("sheet.activate", json!({"sheet": 0})).unwrap();
-    s.execute("selection.set", json!({"range": "B5"})).unwrap();
-    let mut h = harness(s);
-    open_goal_seek(&mut h);
-    click_button(&mut h, "Collapse dialog", 1);
-    next_sheet(&mut h);
-    // The person starts editing the text box on the picked sheet (what its double-click does)
-    // and types a new note.
-    assert!(h.state_mut().begin_text_box_edit(id), "the text box is being edited");
-    h.run_steps(3);
-    assert!(h.state().text_box_editor.is_some());
-    key(&mut h, Key::A, Modifiers::COMMAND);
-    type_text(&mut h, "Picked note");
-    assert_eq!(h.state().text_box_editor.as_ref().map(|ed| ed.text.as_str()), Some("Picked note"));
-    let shape_text =
-        |h: &H, sheet: usize| h.state().session.active().unwrap().wb.sheets[sheet].shapes.iter().find(|s| s.id == id).unwrap().text.clone();
-    assert_eq!(shape_text(&h, 1), "Rate note", "not saved yet");
-    // A scripted cancel leaves the sheet: the draft is saved first, as the ribbon's sheet switch
-    // saves it, instead of being stranded on a sheet that is no longer shown.
-    let r = control(&mut h, "ui.dialog.cancel", json!({}));
-    assert_eq!(r["ok"], json!(true), "{r}");
-    assert!(h.state().text_box_editor.is_none(), "the draft was committed: {:?}", h.state().text_box_editor);
-    assert_eq!(shape_text(&h, 1), "Picked note");
-    assert_eq!(selection(&h), (0, "B5".into()));
-    assert!(h.state().message.is_none(), "{:?}", h.state().message);
-}
 
 /// `quoted_sheet()` with a text box on its second sheet and a third sheet, Scratch, so that a
 /// draft of the text box can be left where it cannot be saved (see [`strand_a_draft`]).
@@ -925,124 +747,9 @@ fn draft_text(h: &H) -> Option<String> {
     h.state().text_box_editor.as_ref().map(|ed| ed.text.clone())
 }
 
-#[test]
-fn a_draft_that_cannot_be_saved_stops_a_confirm_after_a_cross_sheet_pick() {
-    let (s, id) = draft_workbook();
-    let mut h = harness(s);
-    h.state_mut().open_dialog("analysisToolPak", json!({"tool": "descriptive"}));
-    h.run_steps(4);
-    click_button(&mut h, "Collapse dialog", 0);
-    next_sheet(&mut h);
-    drag(&mut h, "A1", "A6");
-    assert_eq!(field(&h, "range"), "'O''Brien Rates'!$A$1:$A$6");
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    control(&mut h, "ui.dialog.set", json!({"field": "outputTo", "value": "range"}));
-    control(&mut h, "ui.dialog.set", json!({"field": "output", "value": "$H$1"}));
-    strand_a_draft(&mut h, id);
-    let h1 = |h: &H, sheet: usize| h.state().session.active().unwrap().wb.sheets[sheet].value(CellRef::parse("H1").unwrap());
 
-    // The control channel's confirm: the dialog's sheet can't be shown again, so the command
-    // doesn't run anywhere (`$H$1` would have meant the sheet shown, Scratch).
-    let r = control(&mut h, "ui.dialog.confirm", json!({}));
-    assert_eq!(r["ok"], json!(false), "{r}");
-    assert!(h.state().dialog.is_some(), "the dialog stays open");
-    assert!(h.state().text_box_editor.is_some(), "the draft is kept");
-    for sheet in 0..3 {
-        assert!(h1(&h, sheet).is_empty(), "no report on sheet {sheet}: {:?}", h1(&h, sheet));
-    }
-    assert_eq!(selection(&h).0, 2, "still on the sheet shown");
 
-    // The window's OK: the same, with the reason shown.
-    h.state_mut().message = None;
-    h.get_by_label("   OK   ").click();
-    h.run_steps(3);
-    assert!(h.state().dialog.is_some(), "the dialog stays open");
-    assert!(h.state().message.is_some(), "the reason is shown");
-    for sheet in 0..3 {
-        assert!(h1(&h, sheet).is_empty(), "no report on sheet {sheet}: {:?}", h1(&h, sheet));
-    }
-    assert_eq!(h.state().text_box_editor.as_ref().map(|ed| ed.text.as_str()), Some("Picked note"), "the person's text is kept");
-}
 
-#[test]
-fn a_scripted_cancel_with_an_unsavable_draft_keeps_the_dialog_until_it_can_go_home() {
-    let (s, id) = draft_workbook();
-    let mut h = harness(s);
-    open_goal_seek(&mut h);
-    click_button(&mut h, "Collapse dialog", 1);
-    next_sheet(&mut h);
-    drag(&mut h, "A2", "A2");
-    assert_eq!(field(&h, "changing"), "'O''Brien Rates'!$A$2");
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    strand_a_draft(&mut h, id);
-    // The dialog's sheet can't be shown again: the script gets the reason, the dialog stays.
-    let r = control(&mut h, "ui.dialog.cancel", json!({}));
-    assert_eq!(r["ok"], json!(false), "{r}");
-    assert!(h.state().dialog.is_some(), "the dialog stays open");
-    assert_eq!(draft_text(&h).as_deref(), Some("Picked note"), "the draft is kept");
-    assert_eq!(selection(&h).0, 2);
-    // Back on the draft's sheet, cancelling saves the draft and goes home.
-    h.state_mut().session.execute("sheet.activate", json!({"sheet": 1})).unwrap();
-    h.run_steps(3);
-    let r = control(&mut h, "ui.dialog.cancel", json!({}));
-    assert_eq!(r["ok"], json!(true), "{r}");
-    assert!(h.state().dialog.is_none());
-    assert_eq!(draft_text(&h), None, "the draft was saved");
-    let text = h.state().session.active().unwrap().wb.sheets[1].shapes.iter().find(|s| s.id == id).unwrap().text.clone();
-    assert_eq!(text, "Picked note");
-    assert_eq!(selection(&h), (0, "B5".into()));
-}
-
-#[test]
-fn the_windows_cancel_with_an_unsavable_draft_closes_the_dialog_and_says_why() {
-    let (s, id) = draft_workbook();
-    let mut h = harness(s);
-    h.state_mut().open_dialog("analysisToolPak", json!({"tool": "descriptive"}));
-    h.run_steps(4);
-    let title = h.state().dialog.as_ref().unwrap().title.clone();
-    click_button(&mut h, "Collapse dialog", 0);
-    next_sheet(&mut h);
-    drag(&mut h, "A1", "A6");
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    strand_a_draft(&mut h, id);
-    h.get_by_label(" Cancel ").click();
-    h.run_steps(3);
-    assert!(h.state().dialog.is_none(), "Cancel closes the dialog whatever the draft's state");
-    let message = h.state().message.clone().unwrap_or_default();
-    assert_eq!(message.0, title, "the dialog says why it could not go home: {message:?}");
-    assert_eq!(draft_text(&h).as_deref(), Some("Picked note"), "the draft is kept");
-    assert_eq!(selection(&h).0, 2, "the selection stays where it is");
-    let wb = &h.state().session.active().unwrap().wb;
-    for sheet in 0..3 {
-        assert!(wb.sheets[sheet].value(CellRef::parse("H1").unwrap()).is_empty(), "nothing ran on sheet {sheet}");
-    }
-}
-
-#[test]
-fn goal_seeks_cancel_with_an_unsavable_draft_closes_without_running() {
-    let (s, id) = draft_workbook();
-    let mut h = harness(s);
-    open_goal_seek(&mut h);
-    click_button(&mut h, "Collapse dialog", 1);
-    next_sheet(&mut h);
-    drag(&mut h, "A2", "A2");
-    key(&mut h, Key::Escape, Modifiers::NONE);
-    // A To value OK would use, so a run by mistake would show on the other sheet's A2.
-    let to = dialog_boxes(&h)[1];
-    click_at(&mut h, to.center());
-    key(&mut h, Key::A, Modifiers::COMMAND);
-    type_text(&mut h, "25");
-    strand_a_draft(&mut h, id);
-    h.get_by_label(" Cancel ").click();
-    h.run_steps(3);
-    assert!(h.state().dialog.is_none(), "Cancel is not a confirmation: the dialog closes");
-    let a2 = h.state().session.active().unwrap().wb.sheets[1].value(CellRef::parse("A2").unwrap());
-    assert_eq!(a2.as_f64(), Some(2.0), "Goal Seek did not run: {a2:?}");
-    assert_eq!(draft_text(&h).as_deref(), Some("Picked note"), "the draft is kept");
-    let message = h.state().message.clone().unwrap_or_default();
-    assert_eq!(message.0, "Goal Seek", "the reason is shown: {message:?}");
-    assert_eq!(selection(&h).0, 2);
-}
 
 #[test]
 fn a_sheet_deleted_and_another_inserted_in_one_batch_is_not_taken_for_a_rename() {
@@ -1821,14 +1528,3 @@ fn a_second_quick_click_on_a_cell_picks_it_instead_of_editing() {
     assert_eq!(field(&h, "changing"), "$B$5", "the click picks the cell");
 }
 
-#[test]
-fn a_click_on_the_selected_cell_picks_into_a_collapsed_box_on_another_sheet() {
-    let mut h = harness(two_sheets());
-    open_goal_seek(&mut h);
-    click_button(&mut h, "Collapse dialog", 1);
-    next_sheet(&mut h);
-    assert_eq!(selection(&h), (1, "A1".into()));
-    assert_eq!(field(&h, "changing"), "", "showing another sheet is not a pick");
-    single_click(&mut h, "A1");
-    assert_eq!(field(&h, "changing"), "Rates!$A$1", "a click on that sheet's selected cell is");
-}

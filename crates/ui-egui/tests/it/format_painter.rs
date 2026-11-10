@@ -3,11 +3,11 @@
 use egui::accesskit::Toggled;
 use egui::{Event, Modifiers, PointerButton, Pos2};
 use egui_kittest::kittest::{NodeT, Queryable};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_engine::model::Style;
 use simplegrid_ui_egui::{SheetApp, grid::Geo};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -50,7 +50,6 @@ fn click_cell(h: &mut Harness, a1: &str) {
     h.run_steps(2);
 }
 
-
 fn header_point(h: &Harness, header: &str) -> Pos2 {
     let app = h.state();
     let sheet = app.session.active().unwrap().wb.active().unwrap();
@@ -84,7 +83,6 @@ fn drag(h: &mut Harness, from: Pos2, to: Pos2) {
 fn stored_cells(h: &Harness) -> usize {
     h.state().session.active().unwrap().wb.active().unwrap().cells.len()
 }
-
 
 #[test]
 fn dragging_over_column_headers_with_a_kept_painter_formats_every_column() {

@@ -100,4 +100,3 @@ fn a_quick_right_click_between_pixels_keeps_the_menu_open_on_retina() {
     h.run_steps(4);
     assert!(h.state().grid.context_menu.is_some(), "the menu stays open");
 }
-

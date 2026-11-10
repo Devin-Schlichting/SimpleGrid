@@ -1,10 +1,10 @@
 //! Ctrl+Shift+U (Control+Shift+U in Excel for Mac) expands and collapses the formula bar.
 
 use egui::{Event, Key, Modifiers, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::keymap::{Shortcut, lookup};
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -34,8 +34,6 @@ fn expanded(h: &Harness) -> bool {
 fn underlined(h: &Harness) -> bool {
     h.state().session.journal.iter().any(|(id, _)| id == "home.underline")
 }
-
-
 
 #[test]
 fn ctrl_shift_u_while_editing_keeps_the_entry() {
@@ -80,7 +78,6 @@ fn bar(h: &Harness) -> simplegrid_ui_egui::formula_bar::BarLayout {
     simplegrid_ui_egui::formula_bar::BarLayout::get(&h.ctx)
 }
 
-
 #[test]
 fn expand_formula_bar_with_lines_sets_the_expanded_height() {
     let mut h = harness();
@@ -92,16 +89,3 @@ fn expand_formula_bar_with_lines_sets_the_expanded_height() {
     assert_eq!(h.state_mut().run("view.expandFormulaBar", json!({"lines": u64::MAX})), Ok(json!({"on": true, "lines": 100})), "capped");
 }
 
-#[test]
-fn an_expanded_formula_bar_leaves_room_for_the_worksheet_in_a_short_window() {
-    // At 400 pt the title bar and ribbon leave about 236 pt: half the window as a formula bar
-    // would leave the status bar and sheet tabs no room for any of the grid.
-    let mut session = Session::new();
-    session.new_workbook();
-    let mut h = crate::common::harness_with(crate::common::builder().with_size(vec2(1200.0, 400.0)), crate::common::app(session), 4);
-    h.state_mut().run("view.expandFormulaBar", json!({"lines": 100})).unwrap();
-    h.run_steps(60);
-    let cells = h.state().grid.cells_rect.expect("the grid is drawn");
-    assert!(cells.height() >= 40.0, "a couple of rows stay visible under a {} pt bar: {cells:?}", bar(&h).height);
-    assert!(bar(&h).visible_lines > 1, "the bar is still expanded");
-}

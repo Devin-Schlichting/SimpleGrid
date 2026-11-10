@@ -1,9 +1,9 @@
 //! The in-cell editor of a Wrap Text cell keeps the column's width and wraps, growing down, as
 //! Excel's does; it used to widen to one long line.
 use egui::{Context, Id, RawInput, Rect, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::SheetApp;
-use serde_json::json;
 
 const TEXT: &str = "Since the 1960s, NASA has left hardware across the solar system, on the Moon, on Mars, and in deep space.";
 

@@ -6,10 +6,10 @@
 use std::sync::Arc;
 
 use egui::{Align2, Color32, CursorIcon, FontId, Painter, Pos2, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
+use serde_json::json;
 use simplegrid_engine::cf::{CfCache, CfLook};
 use simplegrid_engine::core::{CellRef, MAX_COLS, MAX_ROWS, RangeRef, Value, col_to_letters};
 use simplegrid_engine::model::{BorderLine, BorderStyle, Color, HAlign, LineIndex, PatternType, Sheet, Style, Underline, VAlign, Workbook};
-use serde_json::json;
 
 use crate::SheetApp;
 use crate::editor::EditState;

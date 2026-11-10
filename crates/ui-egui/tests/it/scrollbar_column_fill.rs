@@ -2,9 +2,9 @@
 //! dark mode instead of showing a light square (#2086).
 
 use egui::{Shape, pos2};
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_ui_egui::{SheetApp, theme::Tokens};
-use serde_json::json;
 
 #[test]
 /// Dark mode paints the tab-bar fill over the strip beside the final column heading.

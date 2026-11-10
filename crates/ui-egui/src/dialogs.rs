@@ -7,8 +7,8 @@
 use egui::{Color32, Key, Sense, Stroke, StrokeKind, vec2};
 
 use crate::icons::{self, Icon};
-use simplegrid_engine::core::{CellRef, RangeRef};
 use serde_json::{Map, Value as Json, json};
+use simplegrid_engine::core::{CellRef, RangeRef};
 
 use crate::SheetApp;
 use crate::theme;

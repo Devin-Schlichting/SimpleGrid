@@ -149,8 +149,11 @@ pub(super) fn format_cells(app: &mut SheetApp, ui: &mut egui::Ui, d: &mut Dialog
             ui.label(lang.tr("Color:"));
             let colors = app.session.active().map(|doc| doc.wb.theme.colors).unwrap_or_default();
             if let Some(c) = crate::widgets::color_palette(ui, &colors, lang.tr("Automatic")) {
-                st.font.color =
-                    if c == "none" { simplegrid_engine::model::Color::Auto } else { simplegrid_engine::model::Color::from_hex(&c).unwrap_or_default() };
+                st.font.color = if c == "none" {
+                    simplegrid_engine::model::Color::Auto
+                } else {
+                    simplegrid_engine::model::Color::from_hex(&c).unwrap_or_default()
+                };
             }
         }
         "Border" => {

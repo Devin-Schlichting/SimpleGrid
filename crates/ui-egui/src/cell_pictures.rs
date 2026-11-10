@@ -123,7 +123,8 @@ pub(crate) fn paint(painter: &Painter, cell: Rect, picture: &Arc<CellPicture>) {
     }
     // Context-local handles must never leak between offscreen, native or browser
     // egui contexts, even when a workbook shares its Arc payload with another view.
-    let cache = painter.ctx().data_mut(|data| data.get_temp_mut_or_default::<Arc<Mutex<Cache>>>(egui::Id::unique("simplegrid.cell_pictures")).clone());
+    let cache =
+        painter.ctx().data_mut(|data| data.get_temp_mut_or_default::<Arc<Mutex<Cache>>>(egui::Id::unique("simplegrid.cell_pictures")).clone());
     let texture = cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner).texture(painter.ctx(), picture);
     let painter = painter.with_clip_rect(cell.intersect(painter.clip_rect()));
     if let Some(texture) = texture {

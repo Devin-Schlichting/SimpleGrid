@@ -3,12 +3,12 @@
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, pos2, vec2};
 use egui_kittest::kittest::Queryable;
+use serde_json::json;
 use simplegrid_engine::Session;
 use simplegrid_engine::core::CellRef;
 use simplegrid_engine::model::SheetViewMode;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::grid::Geo;
-use serde_json::json;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
@@ -155,7 +155,6 @@ fn the_first_page_edits_its_own_header_when_different_first_page_is_on() {
     assert_eq!(pr.header, "&LLeft", "the other pages keep their header");
 }
 
-
 #[test]
 fn insert_header_and_footer_switches_to_page_layout_view() {
     let mut h = fixture();
@@ -238,7 +237,6 @@ fn per_inch(g: &Geo) -> f32 {
     let pg = g.paper.clone().unwrap();
     (72.0 / (pg.paper_pt.0 as f64 / pg.page_w)) as f32 * g.z
 }
-
 
 #[test]
 fn right_to_left_sheets_mirror_the_horizontal_ruler_drag() {

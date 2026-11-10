@@ -1,9 +1,9 @@
 //! `ui.dialog.confirm` runs a dialog's command with the parameters its OK button sends (#1459).
 
+use serde_json::{Value as Json, json};
 use simplegrid_engine::model::CfRule;
 use simplegrid_ui_egui::SheetApp;
 use simplegrid_ui_egui::control::{Outcome, handle};
-use serde_json::{Value as Json, json};
 
 fn harness() -> egui_kittest::Harness<'static, SheetApp> {
     crate::support::blank_harness(6)
