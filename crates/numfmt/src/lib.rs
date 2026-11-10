@@ -302,6 +302,14 @@ impl NumberFormat {
             fill: None,
             numeric: true,
         };
+        // SimpleGrid: deutsche Schreibweise (1.234,56) für alles außer Datum und Uhrzeit.
+        let general = |n: f64| {
+            let mut g = general(n);
+            if simplegrid_core::locale::german() {
+                g.text = simplegrid_core::locale::localize_number_text(&g.text);
+            }
+            g
+        };
         if self.is_general() {
             return (general(n), false);
         }
@@ -329,7 +337,12 @@ impl NumberFormat {
         if minus && sec.kind != SecKind::Text && !out.zero {
             out.prepend("-");
         }
-        (Formatted { text: out.text, color: sec.color, fill: out.fill, numeric: true }, false)
+        let text = if simplegrid_core::locale::german() && sec.kind != SecKind::Date {
+            simplegrid_core::locale::localize_number_text(&out.text)
+        } else {
+            out.text
+        };
+        (Formatted { text, color: sec.color, fill: out.fill, numeric: true }, false)
     }
 
     /// The number `n` as this format displays it: what Excel stores when "Set precision as
@@ -404,7 +417,15 @@ pub fn format_value(v: &Value, fmt: &NumberFormat, sys: DateSystem) -> Formatted
         Value::Number(n) if !n.is_finite() => Formatted { text: CellError::Num.as_str().into(), ..Formatted::default() },
         Value::Number(n) => fmt.format_number(*n, sys).0,
         Value::Text(t) => fmt.format_text(t),
-        Value::Bool(b) => Formatted { text: if *b { "TRUE" } else { "FALSE" }.into(), ..Formatted::default() },
+        Value::Bool(b) => {
+            let text = match (simplegrid_core::locale::german(), *b) {
+                (true, true) => "WAHR",
+                (true, false) => "FALSCH",
+                (false, true) => "TRUE",
+                (false, false) => "FALSE",
+            };
+            Formatted { text: text.into(), ..Formatted::default() }
+        }
         Value::Error(e) => Formatted { text: e.as_str().into(), ..Formatted::default() },
         Value::Array(a) => match a.data.first() {
             Some(Value::Array(_)) | None => Formatted::default(),

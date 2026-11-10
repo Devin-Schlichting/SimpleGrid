@@ -23,3 +23,19 @@
   gelöscht. 3092 Tests grün, keine Warnungen.
 - Offen/Hinweis: Phase 0 und 1 sind in einem Commit gelandet, weil die Umstellung der Oberfläche den Testlauf
   von Phase 0 bereits beeinflusst hatte.
+
+## Phase 2 – Speichern, Öffnen, Import (2026-11-10)
+- Leiste „Datei“: Neu, Öffnen, Speichern, Speichern unter. „Öffnen“ ersetzt die bisherige Tabelle (vorher Rückfrage
+  bei ungespeicherten Änderungen); wird keine Datei gewählt, bleibt alles, wie es war.
+- Dateiauswahl nur noch „Tabellen (.xlsx, .ods)“ beim Öffnen und „Tabelle (.xlsx)“/„PDF-Dokument“ beim Speichern
+  (kein „Excel“ mehr in der Oberfläche).
+- Eine .ods-Tabelle wird nie als .ods überschrieben: „Speichern“ fragt nach einem .xlsx-Namen.
+- Kaputte oder fremde Dateien: deutsche Meldung „Datei lässt sich nicht öffnen …“; die bisherige Tabelle bleibt.
+  (GridCraft las Nicht-ZIP-Dateien als Text – SimpleGrid prüft vorher Endung und Inhalt.)
+- .ods-Import ausgebaut (`crates/xlsx/src/ods_styles.rs`): Formeln (OpenFormula → interne Schreibweise, auch über
+  Blätter), fett/kursiv/unterstrichen, Schriftgröße, Text- und Hintergrundfarbe, Ausrichtung, Umrandung, Euro-Format,
+  Spaltenbreiten, Zeilenhöhen. Diagramme/Bilder/Filter/bedingte Formate werden ausgelassen; deutscher Hinweis.
+- Deutsche Zahlenschreibweise (`crates/core/src/locale.rs`): Eingabe `12,5`, `1.234,56`, `12,50 €`, `7,5 %`,
+  `10.11.2026`, `WAHR`/`FALSCH`; Anzeige `1.234,56 €`. Gespeichert wird weiter neutral (Dateien wie bisher).
+- Tests: Round-Trip xlsx, ods mit Formaten → xlsx, kaputte Datei, deutsche Zahlen. 3106 Tests grün.
+- Offen: Beispieldateien des Opas zum Prüfen des Imports.

@@ -37,6 +37,10 @@ pub mod texte {
     pub const BLATT_LOESCHEN_TITEL: &str = "Blatt löschen?";
     pub const BLATT_LOESCHEN_TEXT: &str = "Soll das Blatt „{}“ mit allem, was darauf steht, gelöscht werden? Mit „Rückgängig“ können Sie es zurückholen.";
     pub const LETZTES_BLATT: &str = "Das letzte Blatt kann nicht gelöscht werden.";
+    pub const HINWEIS_TITEL: &str = "Hinweis";
+    pub const OEFFNEN_TITEL: &str = "Datei lässt sich nicht öffnen";
+    pub const OEFFNEN_FEHLER: &str = "Die Datei „{}“ konnte nicht geöffnet werden. Vielleicht ist sie beschädigt, oder es ist keine Tabelle im Format .xlsx oder .ods.";
+    pub const IMPORT_HINWEIS: &str = "Nicht alles aus dieser Datei kann angezeigt werden (zum Beispiel Diagramme, Bilder oder Filter). Was SimpleGrid nicht kennt, wurde weggelassen.";
 }
 
 /// Was nach einer Rückfrage zu ungespeicherten Änderungen passieren soll.
@@ -121,6 +125,101 @@ fn datei(app: &mut SheetApp, ui: &mut Ui) {
     if knopf(ui, "Neu", "Eine neue, leere Tabelle anfangen", None, false) {
         neu_oder_oeffnen(app, Danach::Neu);
     }
+    if knopf(ui, "Öffnen", "Eine gespeicherte Tabelle öffnen (.xlsx oder .ods)", None, false) {
+        neu_oder_oeffnen(app, Danach::Oeffnen);
+    }
+    let ohne_mappe = app.session.active().is_none().then_some(texte::NICHT_MOEGLICH);
+    if knopf(ui, "Speichern", "Die Tabelle speichern", ohne_mappe, false) {
+        speichern(app);
+    }
+    if knopf(ui, "Speichern unter", "Die Tabelle unter einem neuen Namen oder an einem anderen Ort speichern", ohne_mappe, false) {
+        speichern_unter(app);
+    }
+}
+
+/// Ob die aktive Mappe als .xlsx-Datei gespeichert ist (dann speichert „Speichern“ direkt dorthin).
+fn ist_xlsx(app: &SheetApp) -> bool {
+    app.session.active().and_then(|d| d.path.as_deref()).is_some_and(|p| p.to_ascii_lowercase().ends_with(".xlsx"))
+}
+
+/// „Speichern“: in die vorhandene .xlsx-Datei; eine neue oder aus .ods übernommene Tabelle fragt
+/// nach Namen und Ort (gespeichert wird immer als .xlsx). Gibt zurück, ob jetzt alles gespeichert ist.
+pub fn speichern(app: &mut SheetApp) -> bool {
+    if !app.commit_edit(0, 0, false, false) {
+        return false;
+    }
+    if ist_xlsx(app) {
+        app.run_or_alert("file.save", json!({}));
+    } else {
+        speichern_unter(app);
+    }
+    app.session.active().is_some_and(|d| !d.is_dirty())
+}
+
+/// „Speichern unter“: fragt nach Namen und Ort, gespeichert wird als .xlsx.
+pub fn speichern_unter(app: &mut SheetApp) {
+    if app.commit_edit(0, 0, false, false) {
+        app.open_dialog("saveAs", json!({}));
+    }
+}
+
+/// „Öffnen“: Datei auswählen und anstelle der bisherigen Tabelle anzeigen. Wird keine Datei
+/// gewählt oder lässt sie sich nicht lesen, bleibt die bisherige Tabelle unverändert.
+fn oeffnen(app: &mut SheetApp) {
+    let Some(pfad) = app.services.pick_open.as_ref().and_then(|pick| pick()) else { return };
+    oeffnen_pfad(app, &pfad);
+}
+
+/// Ob `pfad` eine .xlsx- oder .ods-Datei ist, die auch wirklich wie eine aussieht (ein ZIP-Paket).
+/// Andere Dateien liest SimpleGrid gar nicht erst, statt sie als Text zu deuten.
+fn ist_tabellendatei(pfad: &str) -> bool {
+    let endung = std::path::Path::new(pfad).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase);
+    if !matches!(endung.as_deref(), Some("xlsx" | "ods")) {
+        return false;
+    }
+    let mut kopf = [0u8; 4];
+    std::fs::File::open(pfad).and_then(|mut f| std::io::Read::read_exact(&mut f, &mut kopf)).is_ok() && kopf == [b'P', b'K', 3, 4]
+}
+
+/// Öffnet `pfad` anstelle der bisherigen Tabelle; verständliche Meldung, wenn das nicht geht.
+pub fn oeffnen_pfad(app: &mut SheetApp, pfad: &str) {
+    let name = std::path::Path::new(pfad).file_name().and_then(|n| n.to_str()).unwrap_or(pfad).to_string();
+    let fehler = |app: &mut SheetApp| app.message = Some((texte::OEFFNEN_TITEL.into(), texte::OEFFNEN_FEHLER.replace("{}", &name)));
+    if !ist_tabellendatei(pfad) {
+        fehler(app);
+        return;
+    }
+    let alte: Vec<u64> = app.session.documents().iter().map(|d| d.uid).collect();
+    app.message = None;
+    app.open_path(pfad);
+    let neu = app.session.active().map(|d| d.uid);
+    if neu.is_none_or(|u| alte.contains(&u)) {
+        // Nicht geöffnet (oder Passwortabfrage): die englische Fehlermeldung durch eine deutsche ersetzen.
+        if app.message.take().is_some() {
+            fehler(app);
+        }
+        return;
+    }
+    // Die bisherige Tabelle schließen: SimpleGrid zeigt immer genau eine.
+    let mut i = app.session.documents().len();
+    while i > 0 {
+        i -= 1;
+        if app.session.documents().get(i).is_some_and(|d| alte.contains(&d.uid)) {
+            app.session.close_document(i);
+        }
+    }
+    app.follow_active_window();
+    // Hinweise beim Einlesen (z. B. Diagramme aus einer .ods-Datei) auf Deutsch zusammenfassen:
+    // die Engine meldet sie auf Englisch als Meldungsfenster und als Hinweisleiste.
+    if let Some((_, text)) = app.message.take() {
+        log::info!("Hinweis beim Öffnen von {pfad}: {text}");
+        app.message = Some((texte::HINWEIS_TITEL.into(), texte::IMPORT_HINWEIS.into()));
+    }
+    if let Some(n) = app.notice.as_mut() {
+        log::info!("Hinweis beim Öffnen von {pfad}: {}", n.text);
+        n.text = texte::IMPORT_HINWEIS.into();
+        n.action = None;
+    }
 }
 
 fn blaetter(app: &mut SheetApp, ui: &mut Ui) {
@@ -173,7 +272,7 @@ fn ausfuehren(app: &mut SheetApp, danach: Danach) {
             }
             app.run_or_alert("file.new", json!({}));
         }
-        Danach::Oeffnen => app.run_or_alert("file.open", json!({})),
+        Danach::Oeffnen => oeffnen(app),
     }
 }
 
@@ -210,10 +309,9 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
     app.einfach.frage = None;
     match frage {
         Frage::Ungespeichert { danach } => match wahl {
+            // Nur weiter, wenn wirklich gespeichert wurde (sonst bleibt alles, wie es war).
             texte::SPEICHERN => {
-                app.run_or_alert("file.save", json!({}));
-                // Nur weiter, wenn wirklich gespeichert wurde (sonst bleibt alles, wie es war).
-                if app.session.active().is_some_and(|d| !d.is_dirty()) {
+                if speichern(app) {
                     ausfuehren(app, danach);
                 }
             }
@@ -243,6 +341,8 @@ pub fn kuerzel(app: &mut SheetApp, key: egui::Key) {
 pub fn deutsche_vorgaben(session: &mut simplegrid_engine::Session) {
     session.prefs.sheet_name_stem = "Tabelle".into();
     session.prefs.book_name_stem = "Mappe".into();
+    // Deutsche Zahlen für diesen Thread; das Programm schaltet sie in `main` für alle Threads ein.
+    simplegrid_engine::core::locale::set_german_for_thread(true);
 }
 
 #[cfg(test)]
@@ -324,6 +424,105 @@ mod tests {
         ausfuehren(&mut a, Danach::Neu);
         assert_eq!(a.session.documents().len(), 1);
         assert!(a.session.active().is_some_and(|d| !d.is_dirty()));
+    }
+
+    fn temp(name: &str) -> String {
+        let dir = std::env::temp_dir().join(format!("simplegrid-test-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        dir.join(name).to_string_lossy().into_owned()
+    }
+
+    fn wert(a: &mut SheetApp, zelle: &str) -> Json {
+        a.session.execute("cell.get", json!({"cell": zelle})).map(|v| v["value"].clone()).unwrap_or(Json::Null)
+    }
+
+    #[test]
+    fn speichern_und_oeffnen_ersetzt_die_mappe() {
+        let pfad = temp("rund.xlsx");
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "B2", "input": "12,5"}));
+        a.run_or_alert("home.insertSheet", json!({"before": 1}));
+        a.run_or_alert("file.save", json!({"path": pfad}));
+        assert!(ist_xlsx(&a));
+        assert!(a.session.active().is_some_and(|d| !d.is_dirty()));
+        // In einer frischen Mappe öffnen: genau eine Mappe, mit Inhalt und beiden Blättern.
+        let mut b = app();
+        oeffnen_pfad(&mut b, &pfad);
+        assert!(b.message.is_none(), "{:?}", b.message);
+        assert_eq!(b.session.documents().len(), 1);
+        assert_eq!(blaetter(&b), ["Tabelle1", "Tabelle2"]);
+        let _ = b.session.execute("sheet.activate", json!({"sheet": 0}));
+        assert_eq!(wert(&mut b, "B2"), json!(12.5));
+    }
+
+    #[test]
+    fn kaputte_datei_gibt_deutsche_meldung_und_behaelt_die_tabelle() {
+        let pfad = temp("kaputt.xlsx");
+        let _ = std::fs::write(&pfad, b"das ist keine Tabelle");
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "bleibt"}));
+        oeffnen_pfad(&mut a, &pfad);
+        let (titel, text) = a.message.clone().unwrap_or_default();
+        assert_eq!(titel, texte::OEFFNEN_TITEL);
+        assert!(text.contains("kaputt.xlsx"), "{text}");
+        assert_eq!(a.session.documents().len(), 1);
+        assert_eq!(wert(&mut a, "A1"), json!("bleibt"));
+    }
+
+    #[test]
+    fn ods_wird_als_neue_tabelle_importiert_und_nicht_als_ods_gespeichert() {
+        let pfad = temp("import.ods");
+        let _ = std::fs::write(&pfad, ods_beispiel(""));
+        let mut a = app();
+        oeffnen_pfad(&mut a, &pfad);
+        assert!(a.message.is_none(), "{:?}", a.message);
+        assert_eq!(wert(&mut a, "A1"), json!(3.0));
+        assert_eq!(wert(&mut a, "A2"), json!(4.0));
+        assert_eq!(wert(&mut a, "A3"), json!(7.0));
+        // „Speichern“ würde nach einem .xlsx-Namen fragen, nicht die .ods-Datei überschreiben.
+        assert!(!ist_xlsx(&a));
+    }
+
+    /// Eine kleine .ods-Datei: 3, 4 und =SUMME darunter.
+    fn ods_beispiel(extra: &str) -> Vec<u8> {
+        use std::io::Write;
+        let content = r#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2" office:version="1.2"><office:body><office:spreadsheet><table:table table:name="Haushalt"><table:table-row><table:table-cell office:value-type="float" office:value="3"><text:p>3</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell office:value-type="float" office:value="4"><text:p>4</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell table:formula="of:=SUM([.A1:.A2])" office:value-type="float" office:value="7"><text:p>7</text:p></table:table-cell>EXTRA</table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
+        let content = content.replace("EXTRA", extra);
+        let mut buf = std::io::Cursor::new(Vec::new());
+        {
+            let mut z = zip::ZipWriter::new(&mut buf);
+            let stored = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            let _ = z.start_file("mimetype", stored);
+            let _ = z.write_all(b"application/vnd.oasis.opendocument.spreadsheet");
+            let _ = z.start_file("content.xml", stored);
+            let _ = z.write_all(content.as_bytes());
+            let _ = z.finish();
+        }
+        buf.into_inner()
+    }
+
+    #[test]
+    fn import_hinweis_ist_deutsch() {
+        let pfad = temp("diagramm.ods");
+        let extra = r#"<table:table-cell><draw:frame xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><draw:object/></draw:frame></table:table-cell>"#;
+        let _ = std::fs::write(&pfad, ods_beispiel(extra));
+        let mut a = app();
+        oeffnen_pfad(&mut a, &pfad);
+        assert_eq!(a.message, Some((texte::HINWEIS_TITEL.to_string(), texte::IMPORT_HINWEIS.to_string())));
+        assert_eq!(wert(&mut a, "A3"), json!(7.0));
+    }
+
+    #[test]
+    fn deutsche_zahlen_und_euro() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "1.234,5"}));
+        a.run_or_alert("cell.set", json!({"cell": "A2", "input": "12,5 €"}));
+        assert_eq!(wert(&mut a, "A1"), json!(1234.5));
+        assert_eq!(wert(&mut a, "A2"), json!(12.5));
+        let text = |a: &mut SheetApp, c: &str| a.session.execute("cell.get", json!({"cell": c})).map(|v| v["text"].clone()).unwrap_or(Json::Null);
+        assert_eq!(text(&mut a, "A1"), json!("1.234,50"));
+        assert_eq!(text(&mut a, "A2"), json!("12,50 €"));
     }
 
     #[test]

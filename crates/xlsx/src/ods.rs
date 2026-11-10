@@ -1,5 +1,6 @@
-//! Data-only OpenDocument Spreadsheet import. Formula caches become constants; styles and
-//! other ODF features are deliberately not translated. All fixtures are authored in Rust.
+//! OpenDocument Spreadsheet import. SimpleGrid übernimmt Werte, Formeln (aus der OpenFormula-
+//! Schreibweise umgewandelt), Formate, Spaltenbreiten, Zeilenhöhen und verbundene Zellen
+//! (`ods_styles`). Diagramme, Bilder, Filter und bedingte Formate werden ausgelassen und gemeldet.
 //! Format reference: ODF 1.3, part 3, sections 6.1 and 9.1:
 //! <https://docs.oasis-open.org/office/OpenDocument/v1.3/os/part3-schema/OpenDocument-v1.3-os-part3-schema.html>.
 
@@ -8,12 +9,13 @@ use std::sync::Arc;
 
 use simplegrid_core::date::{days_in_month, serial_from_ymd};
 use simplegrid_core::{CellRef, DateSystem, MAX_COLS, MAX_ROWS, RangeRef, Value};
-use simplegrid_model::{Cell, NumFmt, Sheet, StyleId, Workbook};
+use simplegrid_model::{Cell, Formula, LineInfo, NumFmt, Sheet, StyleId, Workbook};
 use quick_xml::NsReader;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 
+use crate::ods_styles::{OdsStyles, convert_formula};
 use crate::package::{MAX_ENTRIES, Package};
 use crate::{IoError, ReadReport};
 
@@ -23,6 +25,7 @@ const TABLE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const CALC_EXT: &[u8] = b"urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 const MANIFEST: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
+const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const MAX_CELLS: u64 = 1_000_000;
 const MAX_MERGES: u64 = 100_000;
 const MAX_CELL_TEXT: usize = 1024 * 1024;
@@ -57,6 +60,10 @@ pub fn read_ods(bytes: &[u8]) -> Result<(Workbook, ReadReport), IoError> {
     }
     let content = package.read("content.xml")?.ok_or_else(|| IoError::Format("ODS content.xml is missing".into()))?;
     let mut import = Import::new();
+    if let Some(styles) = package.read("styles.xml")? {
+        import.styles.read(&styles);
+    }
+    import.styles.read(&content);
     import.parse(&content)?;
     if import.wb.sheets.is_empty() {
         return Err(IoError::Format("ODS contains no worksheets".into()));
@@ -151,6 +158,9 @@ enum Tag {
     Space,
     Tab,
     Break,
+    Column,
+    /// Diagramm, Bild oder anderes Zeichenobjekt (wird ausgelassen).
+    Drawing,
     Other,
 }
 
@@ -172,8 +182,12 @@ fn tag(reader: &mut NsReader<&[u8]>, e: &BytesStart<'_>) -> Tag {
             b"table-row" => Tag::Row,
             b"table-cell" => Tag::Cell,
             b"covered-table-cell" => Tag::Covered,
+            b"table-column" => Tag::Column,
             _ => Tag::Other,
         };
+    }
+    if is_ns(ns.clone(), DRAW) && matches!(local, b"frame" | b"object" | b"image" | b"g" | b"custom-shape") {
+        return Tag::Drawing;
     }
     if is_ns(ns, TEXT) {
         return match local {
@@ -192,12 +206,18 @@ struct SheetDraft {
     sheet: Sheet,
     depth: usize,
     row: u32,
+    /// Nächste Spalte für `table:table-column`.
+    col: u32,
+    /// Standard-Zellstil je Spaltenbereich: (erste Spalte, letzte Spalte, Stilname).
+    col_styles: Vec<(u32, u32, String)>,
 }
 struct RowDraft {
     depth: usize,
     repeat: u32,
     col: u32,
     cells: Vec<RepeatedCell>,
+    /// Feste Zeilenhöhe in Pixeln aus dem Zeilenstil.
+    height: Option<f32>,
 }
 struct RepeatedCell {
     col: u32,
@@ -215,6 +235,8 @@ struct CellDraft {
     kind: Option<String>,
     raw: Option<String>,
     formula: bool,
+    formula_text: Option<String>,
+    style: Option<String>,
     text: String,
     paragraph: Option<usize>,
     paragraphs: usize,
@@ -233,15 +255,27 @@ struct Import {
     text: u64,
     formats: Vec<(&'static str, StyleId)>,
     spreadsheet_seen: bool,
+    styles: OdsStyles,
 }
 
 impl Import {
     fn new() -> Self {
         let mut wb = Workbook::new();
         wb.sheets.clear();
-        let mut report = ReadReport::default();
-        report.warn("ODS data-only import: formulas become their saved results and will not recalculate. Source formatting, charts, images and other features are not imported. Save a new .xlsx file; ODS saving is not supported.");
-        Self { wb, report, stack: vec![], sheet: None, row: None, cell: None, cells: 0, merges: 0, text: 0, formats: vec![], spreadsheet_seen: false }
+        Self {
+            wb,
+            report: ReadReport::default(),
+            stack: vec![],
+            sheet: None,
+            row: None,
+            cell: None,
+            cells: 0,
+            merges: 0,
+            text: 0,
+            formats: vec![],
+            spreadsheet_seen: false,
+            styles: OdsStyles::default(),
+        }
     }
 
     fn parse(&mut self, bytes: &[u8]) -> Result<(), IoError> {
@@ -324,11 +358,41 @@ impl Import {
                 if name != original {
                     self.report.warn("Some ODS sheet names were shortened or renamed to valid, unique XLSX sheet names.");
                 }
-                self.sheet = Some(SheetDraft { sheet: Sheet::new(name), depth, row: 0 });
+                self.sheet = Some(SheetDraft { sheet: Sheet::new(name), depth, row: 0, col: 0, col_styles: vec![] });
+            }
+            Tag::Column if self.sheet.is_some() && self.row.is_none() => {
+                let repeat = positive(attr(reader, e, TABLE, b"number-columns-repeated")?, 1, u32::MAX)?;
+                let style = attr(reader, e, TABLE, b"style-name")?;
+                let cell_style = attr(reader, e, TABLE, b"default-cell-style-name")?;
+                let width = style.and_then(|n| self.styles.resolved(&n)).and_then(|s| s.column_width);
+                if let Some(sheet) = self.sheet.as_mut() {
+                    let first = sheet.col;
+                    let last = first.saturating_add(repeat - 1).min(MAX_COLS - 1);
+                    if first < MAX_COLS {
+                        if let Some(w) = width.filter(|w| (w - sheet.sheet.default_col_width).abs() > 0.5) {
+                            for c in first..=last {
+                                sheet.sheet.cols.insert(c, LineInfo { size: Some(w.round()), ..Default::default() });
+                            }
+                        }
+                        if let Some(cs) = cell_style.filter(|n| n != "Default") {
+                            sheet.col_styles.push((first, last, cs));
+                        }
+                    }
+                    sheet.col = first.saturating_add(repeat);
+                }
             }
             Tag::Row if self.sheet.as_ref().is_some_and(|s| self.stack.get(s.depth + 1..).is_some_and(|p| p.iter().all(|t| *t == Tag::Rows))) => {
-                self.row =
-                    Some(RowDraft { depth, repeat: positive(attr(reader, e, TABLE, b"number-rows-repeated")?, 1, u32::MAX)?, col: 0, cells: vec![] });
+                let height = attr(reader, e, TABLE, b"style-name")?
+                    .and_then(|n| self.styles.resolved(&n))
+                    .filter(|s| !s.optimal_row_height)
+                    .and_then(|s| s.row_height);
+                self.row = Some(RowDraft {
+                    depth,
+                    repeat: positive(attr(reader, e, TABLE, b"number-rows-repeated")?, 1, u32::MAX)?,
+                    col: 0,
+                    cells: vec![],
+                    height,
+                });
             }
             Tag::Cell | Tag::Covered if self.row.as_ref().is_some_and(|r| depth == r.depth + 1) => {
                 let kind = if attr(reader, e, CALC_EXT, b"value-type")?.as_deref() == Some("error") {
@@ -352,6 +416,8 @@ impl Import {
                     kind,
                     raw: attr(reader, e, OFFICE, key)?,
                     formula: attr(reader, e, TABLE, b"formula")?.is_some(),
+                    formula_text: attr(reader, e, TABLE, b"formula")?,
+                    style: attr(reader, e, TABLE, b"style-name")?,
                     text: String::new(),
                     paragraph: None,
                     paragraphs: 0,
@@ -397,6 +463,20 @@ impl Import {
                     for _ in 0..count {
                         cell.text.push_str(value);
                     }
+                }
+            }
+            Tag::Drawing if self.sheet.is_some() => {
+                self.report.warn("ODS: charts, pictures and drawings are not imported.");
+            }
+            Tag::Other => {
+                let (ns, name) = reader.resolver_mut().resolve_element(e.name());
+                let local = name.as_ref().to_vec();
+                let table = is_ns(ns.clone(), TABLE);
+                let calc = is_ns(ns, CALC_EXT);
+                if table && local == b"filter" {
+                    self.report.warn("ODS: filters are not imported.");
+                } else if calc && local == b"conditional-formats" {
+                    self.report.warn("ODS: conditional formatting is not imported.");
                 }
             }
             _ => {}
@@ -458,7 +538,8 @@ impl Import {
 
     fn finish_cell(&mut self) -> Result<(), IoError> {
         let Some(draft) = self.cell.take() else { return Ok(()) };
-        let cell = self.convert(&draft);
+        let col = self.row.as_ref().map_or(0, |r| r.col);
+        let cell = self.convert(&draft, col);
         let (width, height) = if draft.covered { (1, 1) } else { (draft.width, draft.height) };
         let Some(row) = self.row.as_mut() else { return Ok(()) };
         let kept = !cell.is_blank() || width > 1 || height > 1;
@@ -484,7 +565,7 @@ impl Import {
         Ok(())
     }
 
-    fn convert(&mut self, draft: &CellDraft) -> Cell {
+    fn convert(&mut self, draft: &CellDraft, col: u32) -> Cell {
         let raw = draft.raw.as_deref();
         let mut format = None;
         let value = match draft.kind.as_deref() {
@@ -517,18 +598,42 @@ impl Import {
             let text = if !draft.text.is_empty() { draft.text.as_str() } else if let Some(raw) = raw { raw } else if draft.formula { "[Unavailable ODS formula result]" } else { "[Unsupported ODS value]" };
             Value::Text(Arc::from(text))
         });
-        let style = match format {
-            Some(code) => match self.formats.iter().find(|(f, _)| *f == code) {
-                Some((_, id)) => *id,
-                None => {
-                    let id = self.wb.styles.derive(StyleId::DEFAULT, |s| s.num_fmt = NumFmt::new(code));
-                    self.formats.push((code, id));
-                    id
-                }
-            },
+        // Zellstil: eigener Stil der Zelle, sonst der Standardstil ihrer Spalte.
+        let style_name = draft.style.clone().or_else(|| {
+            self.sheet.as_ref().and_then(|s| s.col_styles.iter().find(|(a, b, _)| (*a..=*b).contains(&col)).map(|(_, _, n)| n.clone()))
+        });
+        let base = match style_name {
+            Some(n) => self.styles.cell_style(&mut self.wb, &n),
             None => StyleId::DEFAULT,
         };
-        Cell { style, ..Cell::value(value) }
+        let style = match format {
+            // Datums- und Prozentformate nur, wenn der Stil selbst kein Zahlenformat setzt.
+            Some(code) if self.wb.styles.get(base).num_fmt == NumFmt::default() => {
+                if base == StyleId::DEFAULT {
+                    match self.formats.iter().find(|(f, _)| *f == code) {
+                        Some((_, id)) => *id,
+                        None => {
+                            let id = self.wb.styles.derive(StyleId::DEFAULT, |s| s.num_fmt = NumFmt::new(code));
+                            self.formats.push((code, id));
+                            id
+                        }
+                    }
+                } else {
+                    self.wb.styles.derive(base, |s| s.num_fmt = NumFmt::new(code))
+                }
+            }
+            _ => base,
+        };
+        let mut cell = Cell { style, ..Cell::value(value) };
+        // Formel aus der OpenFormula-Schreibweise übernehmen; der gespeicherte Wert bleibt als
+        // Ergebnis stehen, bis neu gerechnet wird.
+        if let Some(src) = &draft.formula_text {
+            match convert_formula(src).map(|t| Formula::new(&format!("={t}"))).filter(|f| f.expr.is_some()) {
+                Some(f) => cell.formula = Some(Arc::new(f)),
+                None => self.report.warn("ODS: some formulas could not be converted; their last results were kept as values."),
+            }
+        }
+        cell
     }
 
     fn finish_row(&mut self) -> Result<(), IoError> {
@@ -540,6 +645,15 @@ impl Import {
             None if row.cells.is_empty() => MAX_ROWS,
             None => return Err(IoError::TooLarge("ODS exceeds worksheet height".into())),
         };
+        if let Some(h) = row.height.filter(|h| (h - sheet.sheet.default_row_height).abs() > 0.5) {
+            // Nur für Zeilen mit Inhalt oder wenige Wiederholungen: Leerzeilen bis zum Blattende
+            // würden sonst Millionen Einträge anlegen.
+            if row.repeat <= 1000 || !row.cells.is_empty() {
+                for r in sheet.row..end.min(sheet.row.saturating_add(1000)) {
+                    sheet.sheet.rows.insert(r, LineInfo { size: Some(h.round()), custom: true, ..Default::default() });
+                }
+            }
+        }
         for entry in row.cells {
             let count = u64::from(entry.repeat) * u64::from(row.repeat);
             if !entry.cell.is_blank() {

@@ -4856,6 +4856,7 @@ dependencies = [
  "web-sys",
  "web-time",
  "zbus",
+ "zip 3.0.0",
 ]
 
 [[package]]

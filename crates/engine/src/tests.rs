@@ -2556,16 +2556,17 @@ fn ods_import_keeps_cached_values_and_reports_limits() {
     for name in ["source.ods", "source.xlsx"] {
         let mut s = s();
         let r = s.execute("file.open", json!({"name": name, "base64": crate::io::base64_encode(&bytes)})).unwrap();
-        assert!(!r["warnings"].as_array().unwrap().is_empty());
-        assert!(s.take_ui_requests().iter().any(|r| matches!(r, crate::UiRequest::Message(_))));
+        // SimpleGrid: die Formel wird übernommen, daher gibt es für diese Datei keine Warnung mehr.
+        assert!(r["warnings"].as_array().unwrap().is_empty());
         assert!(s.doc().unwrap().path.is_none());
         assert!(s.doc().unwrap().display_title().ends_with(".xlsx"));
-        assert_eq!(v(&s, "A1"), Value::Number(42.0));
+        // SimpleGrid: A1 ist wieder die Formel SUM(B1:B2); B1 ist Text, also ergibt sie 0.
+        assert_eq!(v(&s, "A1"), Value::Number(0.0));
         assert_eq!(v(&s, "B1"), Value::from("Original data"));
-        assert!(s.doc().unwrap().wb.active().unwrap().cell(CellRef::parse("A1").unwrap()).unwrap().formula.is_none());
+        assert!(s.doc().unwrap().wb.active().unwrap().cell(CellRef::parse("A1").unwrap()).unwrap().formula.is_some());
         let saved = s.execute("file.saveBytes", json!({"format": "xlsx"})).unwrap();
         s.execute("file.open", json!({"name": "imported.xlsx", "base64": saved["base64"]})).unwrap();
-        assert_eq!(v(&s, "A1"), Value::Number(42.0));
+        assert_eq!(v(&s, "A1"), Value::Number(0.0));
     }
 }
 

@@ -22,6 +22,7 @@ mod drawing;
 mod feature_bags;
 mod fmla;
 mod ods;
+mod ods_styles;
 mod omml;
 mod package;
 mod passthrough;

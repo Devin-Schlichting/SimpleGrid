@@ -40,7 +40,7 @@ fn ods_namespace_declaration_bomb_is_rejected() {
 }
 
 #[test]
-fn ods_typed_values_and_formula_caches_are_constants_and_survive_xlsx() {
+fn ods_typed_values_and_formulas_with_cached_results_survive_xlsx() {
     let bytes = row(r#"
         <table:table-cell office:value-type="float" office:value="42.5"/>
         <table:table-cell office:value-type="boolean" office:boolean-value="true"/>
@@ -54,7 +54,6 @@ fn ods_typed_values_and_formula_caches_are_constants_and_survive_xlsx() {
         <table:table-cell office:value-type="boolean" office:boolean-value="0"/>
     "#);
     let (wb, report) = read_ods(&bytes).unwrap();
-    assert!(report.warnings.iter().any(|w| w.contains("data-only") && w.contains("will not recalculate")));
     assert!(report.warnings.iter().any(|w| w.contains("unsupported or missing")));
     let expected = [
         Value::Number(42.5),
@@ -70,7 +69,15 @@ fn ods_typed_values_and_formula_caches_are_constants_and_survive_xlsx() {
     ];
     for (c, value) in expected.iter().enumerate() {
         assert_eq!(&wb.sheets[0].value(CellRef::new(0, c as u32)), value);
-        assert!(wb.sheets[0].cell(CellRef::new(0, c as u32)).unwrap().formula.is_none());
+        // SimpleGrid: OpenFormula-Formeln bleiben Formeln (mit dem gespeicherten Ergebnis).
+        let formula = wb.sheets[0].cell(CellRef::new(0, c as u32)).unwrap().formula.as_ref().map(|f| f.text.clone());
+        let want = match c {
+            5 => Some("A1*2"),
+            6 => Some("1/0"),
+            7 => Some("UNKNOWN()"),
+            _ => None,
+        };
+        assert_eq!(formula.as_deref(), want, "column {c}");
     }
     let (reopened, _) = read_xlsx(&write_xlsx(&wb).unwrap()).unwrap();
     for (c, value) in expected.iter().enumerate() {
@@ -134,7 +141,7 @@ fn ods_dates_and_durations_use_formats_and_unsupported_values_stay_text() {
     }
     assert_eq!(wb.styles.get(s.cell(CellRef::new(0, 0)).unwrap().style).num_fmt.0.as_ref(), "yyyy-mm-dd");
     assert_eq!(wb.styles.get(s.cell(CellRef::new(0, 2)).unwrap().style).num_fmt.0.as_ref(), "[h]:mm:ss.000");
-    assert_eq!(report.warnings.len(), 2);
+    assert_eq!(report.warnings.len(), 1);
 }
 
 #[test]
@@ -263,4 +270,62 @@ fn ods_blank_repeats_past_the_sheet_edge_are_clipped() {
         r#"<table:table table:name="Data"><table:table-row table:number-rows-repeated="1048576"><table:table-cell/></table:table-row><table:table-row><table:table-cell office:value-type="float" office:value="1"/></table:table-row></table:table>"#,
     );
     assert!(matches!(read_ods(&late), Err(IoError::TooLarge(_))));
+}
+
+/// SimpleGrid: Formate, Spaltenbreiten, Zeilenhöhen, Euro-Format, Formeln über Blätter hinweg und
+/// ausgelassene Diagramme, wie sie eine typische LibreOffice-Datei enthält.
+#[test]
+fn ods_formats_widths_heights_euro_and_formulas_are_imported() {
+    use simplegrid_model::{BorderStyle, Color, HAlign, Underline};
+    let styles = br#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"><office:styles><style:style style:name="Default" style:family="table-cell"/><style:style style:name="Ueberschrift" style:family="table-cell" style:parent-style-name="Default"><style:text-properties fo:font-weight="bold" fo:font-size="14pt"/></style:style></office:styles></office:document-styles>"#;
+    let content = r##"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2">
+<office:automatic-styles>
+  <number:currency-style style:name="N111"><number:number number:decimal-places="2" number:min-integer-digits="1" number:grouping="true"/><number:text> </number:text><number:currency-symbol number:language="de" number:country="DE">€</number:currency-symbol></number:currency-style>
+  <style:style style:name="co1" style:family="table-column"><style:table-column-properties style:column-width="5cm"/></style:style>
+  <style:style style:name="ro1" style:family="table-row"><style:table-row-properties style:row-height="1cm" style:use-optimal-row-height="false"/></style:style>
+  <style:style style:name="ce1" style:family="table-cell" style:parent-style-name="Ueberschrift"><style:table-cell-properties fo:background-color="#ffff00" fo:border="0.74pt solid #ff0000"/><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-style="italic" style:text-underline-style="solid" fo:color="#0000ff"/></style:style>
+  <style:style style:name="ce2" style:family="table-cell" style:data-style-name="N111"/>
+</office:automatic-styles>
+<office:body><office:spreadsheet>
+<table:table table:name="Haushalt">
+  <table:table-column table:style-name="co1" table:default-cell-style-name="Default"/>
+  <table:table-column table:number-columns-repeated="1023" table:default-cell-style-name="Default"/>
+  <table:table-row table:style-name="ro1"><table:table-cell table:style-name="ce1" office:value-type="string"><text:p>Ausgaben</text:p></table:table-cell></table:table-row>
+  <table:table-row><table:table-cell table:style-name="ce2" office:value-type="currency" office:currency="EUR" office:value="1234.5"><text:p>1.234,50 €</text:p></table:table-cell></table:table-row>
+  <table:table-row><table:table-cell table:style-name="ce2" table:formula="of:=SUM([.A2];[$Rest.A1])" office:value-type="currency" office:currency="EUR" office:value="1236.5"><text:p>1.236,50 €</text:p></table:table-cell><table:table-cell><draw:frame><draw:object/></draw:frame></table:table-cell></table:table-row>
+</table:table>
+<table:table table:name="Rest"><table:table-row><table:table-cell office:value-type="float" office:value="2"/></table:table-row></table:table>
+</office:spreadsheet></office:body></office:document-content>"##;
+    let bytes = make_zip(&[("mimetype", MIME), ("META-INF/manifest.xml", MANIFEST), ("styles.xml", styles), ("content.xml", content.as_bytes())]);
+    let (wb, report) = read_ods(&bytes).unwrap();
+    let s = &wb.sheets[0];
+    // Spaltenbreite 5 cm = 189 px, Zeilenhöhe 1 cm = 38 px.
+    assert_eq!(s.col_width(0), 189.0);
+    assert_eq!(s.row_height(0), 38.0);
+    let st = wb.styles.get(s.cell(CellRef::new(0, 0)).unwrap().style);
+    assert!(st.font.bold, "fett vom Elternstil");
+    assert_eq!(st.font.size, 14.0);
+    assert!(st.font.italic);
+    assert_eq!(st.font.underline, Underline::Single);
+    assert_eq!(st.font.color, Color::Rgb(0x0000ff));
+    assert_eq!(st.fill.fg, Color::Rgb(0xffff00));
+    assert_eq!(st.align.h, HAlign::Center);
+    assert_eq!(st.borders.left.style, BorderStyle::Thin);
+    assert_eq!(st.borders.bottom.color, Color::Rgb(0xff0000));
+    let euro = wb.styles.get(s.cell(CellRef::new(1, 0)).unwrap().style);
+    assert_eq!(euro.num_fmt.0.as_ref(), crate::ods_styles::EURO_FORMAT);
+    let f = s.cell(CellRef::new(2, 0)).unwrap();
+    assert_eq!(f.formula.as_ref().map(|f| f.text.as_str()), Some("SUM(A2,Rest!A1)"));
+    assert_eq!(f.value, Value::Number(1236.5));
+    assert!(report.warnings.iter().any(|w| w.contains("charts")), "{:?}", report.warnings);
+    // Und alles übersteht das Speichern als .xlsx.
+    let (re, _) = read_xlsx(&write_xlsx(&wb).unwrap()).unwrap();
+    let r = &re.sheets[0];
+    assert_eq!(r.col_width(0), 189.0);
+    assert_eq!(r.row_height(0), 38.0);
+    let st = re.styles.get(r.cell(CellRef::new(0, 0)).unwrap().style);
+    assert!(st.font.bold && st.font.italic);
+    assert_eq!(st.fill.fg, Color::Rgb(0xffff00));
+    assert_eq!(re.styles.get(r.cell(CellRef::new(1, 0)).unwrap().style).num_fmt.0.as_ref(), crate::ods_styles::EURO_FORMAT);
+    assert_eq!(r.cell(CellRef::new(2, 0)).unwrap().formula.as_ref().map(|f| f.text.as_str()), Some("SUM(A2,Rest!A1)"));
 }
