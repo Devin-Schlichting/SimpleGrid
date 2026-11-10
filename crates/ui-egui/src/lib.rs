@@ -52,6 +52,7 @@ pub mod pivot_pane;
 pub mod printing;
 pub mod ribbon;
 pub mod seitenansicht;
+pub mod sicherung;
 pub mod selection_glide;
 pub mod tabs;
 pub mod text_box;
@@ -109,6 +110,9 @@ pub struct UiState {
     /// change. A preference like the rest of this struct — it stays on across restarts (#1901).
     pub autosave: bool,
     pub recent: Vec<String>,
+    /// SimpleGrid: beim Start die zuletzt benutzte Tabelle wieder öffnen (abschaltbar).
+    #[serde(default = "ja")]
+    pub letzte_datei_oeffnen: bool,
     /// One-shot keytip request for a ribbon control: set when a keytip action resolves to
     /// [`keytips::Action::Control`], consumed (and cleared) by the control's render site.
     #[serde(skip)]
@@ -139,6 +143,10 @@ pub fn clamp_interface_scale(percent: f64) -> Option<u16> {
     percent.is_finite().then(|| percent.round().clamp(INTERFACE_SCALE_MIN as f64, INTERFACE_SCALE_MAX as f64) as u16)
 }
 
+fn ja() -> bool {
+    true
+}
+
 fn lenient_interface_scale<'de, D: serde::Deserializer<'de>>(d: D) -> Result<u16, D::Error> {
     let v = Json::deserialize(d)?;
     Ok(v.as_f64().and_then(clamp_interface_scale).unwrap_or(100))
@@ -159,6 +167,7 @@ impl Default for UiState {
             highlight_active_row: false,
             autosave: false,
             recent: vec![],
+            letzte_datei_oeffnen: true,
             keytip_invoke: None,
             keytip_invoke_next: None,
             language: i18n::Language::En,

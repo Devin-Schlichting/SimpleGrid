@@ -168,78 +168,8 @@ fn click_commands(h: &mut egui_kittest::Harness<'static, SheetApp>, label: &str)
     step_commands(h)
 }
 
-#[test]
-fn closing_the_window_asks_about_every_unsaved_workbook() {
-    let mut h = harness(Services::default());
-    h.state_mut().run("cell.set", serde_json::json!({"cell": "A1", "input": "42"})).unwrap();
-    h.state_mut().run("file.new", serde_json::json!({})).unwrap();
-    h.state_mut().run("cell.set", serde_json::json!({"cell": "B2", "input": "7"})).unwrap();
-    h.run_steps(2);
 
-    let sent = request_window_close(&mut h);
-    assert!(sent.contains(&egui::ViewportCommand::CancelClose), "unsaved changes hold the window open: {sent:?}");
-    assert_eq!(h.state().dialog.as_ref().map(|d| d.name()), Some("saveChanges"));
-    let sent = click_commands(&mut h, "Cancel");
-    assert!(!sent.contains(&egui::ViewportCommand::Close), "Cancel keeps the app open");
-    assert!(h.state().dialog.is_none());
-    assert_eq!(h.state().session.documents().len(), 2, "Cancel keeps both workbooks");
 
-    request_window_close(&mut h);
-    let sent = click_commands(&mut h, "Don't Save");
-    assert!(!sent.contains(&egui::ViewportCommand::Close), "the other workbook is still unsaved");
-    assert_eq!(h.state().session.documents().len(), 1);
-    assert_eq!(h.state().dialog.as_ref().map(|d| d.name()), Some("saveChanges"), "then it asks about the next one");
-    let sent = click_commands(&mut h, "Don't Save");
-    assert!(sent.contains(&egui::ViewportCommand::Close), "once every workbook is answered the window closes: {sent:?}");
-    let sent = request_window_close(&mut h);
-    assert!(!sent.contains(&egui::ViewportCommand::CancelClose), "the close that follows is let through");
-}
-
-#[test]
-fn closing_the_window_can_save_first_and_a_saved_workbook_closes_at_once() {
-    let dir = std::env::temp_dir().join(format!("simplegrid-close-window-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join("Book.xlsx").to_string_lossy().into_owned();
-    let mut h = harness(Services::default());
-    h.state_mut().run("file.save", serde_json::json!({"path": &path})).unwrap();
-    h.run_steps(2);
-    let sent = request_window_close(&mut h);
-    assert!(!sent.contains(&egui::ViewportCommand::CancelClose), "nothing unsaved: the window just closes");
-    assert!(h.state().dialog.is_none());
-
-    // A cell still being typed is an unsaved change too.
-    h.input_mut().events.push(egui::Event::Text("123".into()));
-    h.run_steps(2);
-    assert!(h.state().editor.is_some());
-    let sent = request_window_close(&mut h);
-    assert!(sent.contains(&egui::ViewportCommand::CancelClose), "{sent:?}");
-    let sent = click_commands(&mut h, "Save");
-    assert!(sent.contains(&egui::ViewportCommand::Close), "{sent:?}");
-    let (wb, _) = simplegrid_engine::io::open_bytes("Book.xlsx", &std::fs::read(&path).unwrap()).unwrap();
-    assert_eq!(wb.active().unwrap().value(CellRef::new(0, 0)), Value::Number(123.0), "Save wrote the change before closing");
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn quitting_with_one_of_two_workbooks_unsaved_asks_once() {
-    let mut h = harness(Services::default());
-    h.state_mut().run("cell.set", serde_json::json!({"cell": "A1", "input": "42"})).unwrap();
-    h.state_mut().run("file.new", serde_json::json!({})).unwrap();
-    h.run_steps(2);
-
-    let sent = request_window_close(&mut h);
-    assert!(sent.contains(&egui::ViewportCommand::CancelClose), "{sent:?}");
-    assert_eq!(h.state().dialog.as_ref().map(|d| d.name()), Some("saveChanges"));
-    assert_eq!(h.state().session.active_index(), 0, "the unsaved workbook comes forward");
-    let sent = click_commands(&mut h, "Cancel");
-    assert!(!sent.contains(&egui::ViewportCommand::Close), "Cancel stops the quit");
-    assert_eq!(h.state().session.documents().len(), 2, "Cancel keeps both workbooks");
-
-    request_window_close(&mut h);
-    let sent = click_commands(&mut h, "Don't Save");
-    assert!(sent.contains(&egui::ViewportCommand::Close), "the saved workbook isn't asked about: {sent:?}");
-    assert!(h.state().dialog.is_none());
-}
 
 /// Book1 has a cell being typed when File › New runs (the macOS menu runs the command directly).
 fn typing_in_book1_then_new(h: &mut egui_kittest::Harness<'static, SheetApp>) -> u64 {
@@ -482,38 +412,6 @@ fn save_a_copy_with_a_bare_name_asks_where_to_save_it() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-#[test]
-fn new_window_shows_the_same_workbook_and_a_draft_settles_in_its_own_window() {
-    let mut h = harness(Services::default());
-    h.state_mut().run("selection.set", serde_json::json!({"range": "B2"})).unwrap();
-    let first = h.state().session.active_window().unwrap();
-    h.state_mut().run_or_alert("view.newWindow", serde_json::json!({}));
-    h.run_steps(2);
-    let second = h.state().session.active_window().unwrap();
-    let book = h.state().session.doc().unwrap().uid;
-    assert_ne!(first, second);
-    assert_eq!(h.state().session.documents().len(), 1, "one workbook, two windows");
-    let titles: Vec<String> = h.state().open_windows().iter().map(|w| w.title.clone()).collect();
-    assert_eq!(titles, ["Book1:1", "Book1:2"]);
-
-    // A draft typed in window 2 is entered in window 2's cell before window 1 comes forward.
-    h.state_mut().run("selection.set", serde_json::json!({"range": "D4"})).unwrap();
-    h.input_mut().events.push(egui::Event::Text("typed".into()));
-    h.run_steps(2);
-    h.state_mut().run_or_alert("view.switchWindows", serde_json::json!({"window": first}));
-    h.run_steps(2);
-    assert!(h.state().editor.is_none(), "the draft doesn't follow into window 1");
-    assert_eq!(h.state().session.active_window(), Some(first));
-    let d = h.state().session.doc().unwrap();
-    assert_eq!(d.wb.active().unwrap().value(CellRef::parse("D4").unwrap()), Value::text("typed"));
-    assert_eq!(d.selection.active, CellRef::parse("B2").unwrap(), "window 1 keeps its own selection");
-
-    // Quitting asks once about the workbook, whichever window shows it.
-    request_window_close(&mut h);
-    let sent = click_commands(&mut h, "Don't Save");
-    assert!(sent.contains(&egui::ViewportCommand::Close), "{sent:?}");
-    assert!(h.state().session.document_index(book).is_none(), "both windows closed with the workbook");
-}
 
 #[test]
 fn control_requests_route_to_a_window_and_list_windows() {

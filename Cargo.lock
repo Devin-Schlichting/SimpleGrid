@@ -4835,6 +4835,7 @@ version = "0.16.0"
 name = "simplegrid-ui-egui"
 version = "0.16.0"
 dependencies = [
+ "chrono",
  "craft-ui",
  "craft-update",
  "craft-window",

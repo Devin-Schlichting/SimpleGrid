@@ -94,3 +94,16 @@
 - Leeres Blatt: „Auf diesem Blatt steht nichts zum Drucken.“ statt einer leeren Seite.
 - Tests: Seitenzahl hoch/quer/eine Seite, jede Zeile genau einmal gedruckt, Druckbereich, Fußzeile, Schwarz-Weiß im
   PDF, Speichern der Druckeinstellungen. Noch offen: praktischer Probedruck auf einem echten Drucker.
+
+## Phase 8 – Schutz vor Fehlern (2026-11-10)
+- Schließen, „Neu“ und „Öffnen“ mit ungespeicherten Änderungen: Rückfrage „Speichern / Nicht speichern / Abbrechen“
+  (ersetzt GridCraft's Mehrfenster-Dialog; SimpleGrid hat immer genau eine Tabelle).
+- Automatische Sicherung alle 2,5 Minuten nach `%LocalAppData%\SimpleGrid\Sicherung` (nie in die eigene Datei),
+  nur bei ungespeicherten Änderungen; nach dem Speichern/regulären Beenden wieder gelöscht (`sicherung.rs`).
+- Nach einem Absturz fragt der nächste Start „Tabelle wiederherstellen?“; wiederhergestellt gilt als ungespeichert.
+- Beim Start wird die zuletzt benutzte Tabelle geöffnet; abschaltbar unter „Info und Einstellungen“ (neue Gruppe „Hilfe“).
+- Unerwartete Fehler beim Zeichnen beenden das Programm nicht: Tabelle wird gesichert, freundliche Meldung
+  (Befehle der Engine fängt GridCraft ohnehin ab).
+- Tests: Sicherung/Wiederherstellung, Takt nur bei Änderungen, Aufräumen nach dem Speichern, Schließen fragt,
+  Fehler → Sicherung, letzte Datei an/aus, Zeile mit Daten löschen → Rückgängig. Entfernt: Tests des alten
+  Mehrfenster-Schließdialogs.

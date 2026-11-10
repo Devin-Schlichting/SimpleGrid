@@ -335,6 +335,10 @@ impl DocState {
     pub fn is_dirty(&self) -> bool {
         !Arc::ptr_eq(&self.wb, &self.saved)
     }
+    /// SimpleGrid: als ungespeichert markieren (z. B. eine wiederhergestellte Sicherung).
+    pub fn mark_dirty(&mut self) {
+        self.saved = Arc::new(Workbook::clone(&self.wb));
+    }
     pub fn sheet_index(&self) -> usize {
         self.wb.active_sheet()
     }

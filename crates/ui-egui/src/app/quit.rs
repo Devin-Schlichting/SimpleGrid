@@ -23,12 +23,10 @@ impl SheetApp {
             return;
         }
         ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-        match self.dialog.as_mut() {
-            // Already asking about a workbook (File › Close): answering it now goes on to quit.
-            Some(d) if d.name() == "saveChanges" => {
-                d.values.insert("quit".into(), json!(true));
-            }
-            _ => self.continue_quit(ctx),
+        // SimpleGrid: die eigene Rückfrage „Speichern / Nicht speichern / Abbrechen“.
+        let _ = json!(null);
+        if self.einfach.frage.is_none() {
+            self.einfach.frage = Some(crate::einfach::Frage::Ungespeichert { danach: crate::einfach::Danach::Beenden });
         }
     }
 

@@ -50,6 +50,8 @@ pub enum Danach {
     Neu,
     /// Eine Datei öffnen.
     Oeffnen,
+    /// Das Programm beenden.
+    Beenden,
 }
 
 /// Eine offene Rückfrage der einfachen Oberfläche.
@@ -61,6 +63,8 @@ pub enum Frage {
     BlattLoeschen { blatt: usize, name: String },
     /// Eine Aktion, die Daten entfernt, erst nach Bestätigung ausführen.
     Bestaetigen { titel: String, text: String, knopf: String, befehl: String, params: Json },
+    /// Nach einem Absturz: die Sicherung wiederherstellen?
+    Wiederherstellen { titel: String, zeit: String },
 }
 
 /// Zustand der einfachen Oberfläche.
@@ -73,6 +77,12 @@ pub struct Zustand {
     pub rahmen_farbe: String,
     /// Die offene Seitenansicht (Druckvorschau), falls gezeigt.
     pub seitenansicht: Option<crate::seitenansicht::Seitenansicht>,
+    /// Automatische Sicherung (Ordner wird vom Programm gesetzt; ohne Ordner aus).
+    pub sicherung: crate::sicherung::Sicherung,
+    /// Nach „Speichern“/„Nicht speichern“ beim Schließen: das Fenster jetzt schließen.
+    pub jetzt_beenden: bool,
+    /// Das Fenster „Info und Einstellungen“ ist offen.
+    pub info_offen: bool,
 }
 
 /// Schriftgrößen zur Auswahl (feste Stufen).
@@ -196,6 +206,11 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
             gruppe(ui, "Umrandung", |ui| umrandung(app, ui));
             gruppe(ui, "Ansicht", |ui| ansicht(app, ui));
             gruppe(ui, "Drucken", |ui| drucken(app, ui));
+            gruppe(ui, "Hilfe", |ui| {
+                if knopf(ui, "Info und Einstellungen", "Version, Einstellungen und Updates", None, false) {
+                    app.einfach.info_offen = true;
+                }
+            });
             gruppe(ui, "Tabellenblatt", |ui| blaetter(app, ui));
         }).response);
         gemessen = r.content_size.y + 16.0;
@@ -519,6 +534,60 @@ fn ansicht(app: &mut SheetApp, ui: &mut Ui) {
     }
 }
 
+/// Merkt sich die gespeicherte Datei der aktiven Tabelle als „zuletzt benutzt“.
+pub fn zuletzt_merken(app: &mut SheetApp) {
+    let Some(pfad) = app.session.active().and_then(|d| d.path.clone()) else { return };
+    if !pfad.to_ascii_lowercase().ends_with(".xlsx") || app.ui.recent.first() == Some(&pfad) {
+        return;
+    }
+    app.ui.recent.retain(|p| p != &pfad);
+    app.ui.recent.insert(0, pfad);
+    app.ui.recent.truncate(20);
+}
+
+/// Beim Start: Sicherung nach Absturz anbieten, sonst (falls eingeschaltet) die zuletzt
+/// benutzte Tabelle öffnen.
+pub fn beim_start(app: &mut SheetApp) {
+    if let Some(info) = app.einfach.sicherung.vorhanden() {
+        app.einfach.frage = Some(Frage::Wiederherstellen { titel: info.titel, zeit: info.zeit });
+        return;
+    }
+    let unberuehrt = app.session.documents().len() == 1 && app.session.active().is_some_and(|d| d.path.is_none() && !d.is_dirty());
+    if app.ui.letzte_datei_oeffnen
+        && unberuehrt
+        && let Some(pfad) = app.ui.recent.first().cloned()
+        && std::path::Path::new(&pfad).is_file()
+    {
+        oeffnen_pfad(app, &pfad);
+    }
+}
+
+/// Das kleine Fenster „Info und Einstellungen“.
+fn info_fenster(app: &mut SheetApp, ctx: &egui::Context) {
+    if !app.einfach.info_offen {
+        return;
+    }
+    let mut offen = true;
+    egui::Modal::new(egui::Id::unique("simplegrid.info")).show(ctx, |ui| {
+        ui.set_width(520.0);
+        ui.label(RichText::new("SimpleGrid").font(theme::ui_bold(masse::SCHRIFT + 6.0)));
+        ui.label(RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION"))).font(theme::ui_font(masse::SCHRIFT)));
+        ui.add_space(4.0);
+        ui.label(RichText::new("Ein einfaches Tabellenprogramm. Beruht auf GridCraft (MIT OR Apache-2.0).").font(theme::ui_font(masse::SCHRIFT - 2.0)));
+        ui.add_space(12.0);
+        ui.label(RichText::new("Einstellungen").font(theme::ui_bold(masse::SCHRIFT)));
+        let mut an = app.ui.letzte_datei_oeffnen;
+        if ui.checkbox(&mut an, RichText::new("Beim Start die zuletzt benutzte Tabelle öffnen").font(theme::ui_font(masse::SCHRIFT))).changed() {
+            app.ui.letzte_datei_oeffnen = an;
+        }
+        ui.add_space(16.0);
+        if knopf(ui, "Schließen", "Dieses Fenster schließen", None, false) || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            offen = false;
+        }
+    });
+    app.einfach.info_offen = offen;
+}
+
 /// Die Klartext-Erklärung zum Fehlerwert der markierten Zelle, z. B. „Durch Null geteilt …“.
 pub fn fehler_erklaerung(app: &SheetApp) -> Option<String> {
     let d = app.session.active()?;
@@ -731,11 +800,21 @@ fn ausfuehren(app: &mut SheetApp, danach: Danach) {
             app.run_or_alert("file.new", json!({}));
         }
         Danach::Oeffnen => oeffnen(app),
+        Danach::Beenden => {
+            app.allow_close = true;
+            app.einfach.jetzt_beenden = true;
+        }
     }
 }
 
 /// Zeigt eine offene Rückfrage als Fenster mit großen Schaltflächen.
 pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
+    if app.einfach.jetzt_beenden {
+        app.einfach.jetzt_beenden = false;
+        app.einfach.sicherung.loeschen();
+        ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
+    }
+    info_fenster(app, ctx);
     let Some(frage) = app.einfach.frage.clone() else { return };
     let (titel, text, knoepfe): (&str, String, Vec<&str>) = match &frage {
         Frage::Ungespeichert { .. } => {
@@ -744,6 +823,11 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
         }
         Frage::BlattLoeschen { name, .. } => (texte::BLATT_LOESCHEN_TITEL, texte::BLATT_LOESCHEN_TEXT.replace("{}", name), vec![texte::LOESCHEN, texte::ABBRECHEN]),
         Frage::Bestaetigen { titel, text, knopf, .. } => (titel.as_str(), text.clone(), vec![knopf.as_str(), texte::ABBRECHEN]),
+        Frage::Wiederherstellen { titel, zeit } => (
+            "Tabelle wiederherstellen?",
+            format!("SimpleGrid wurde beim letzten Mal nicht richtig beendet. Es gibt eine Sicherung von „{titel}“ vom {zeit}. Möchten Sie sie wiederherstellen?"),
+            vec!["Wiederherstellen", "Nicht wiederherstellen"],
+        ),
     };
     let mut gewaehlt: Option<&str> = None;
     egui::Modal::new(egui::Id::unique("simplegrid.rueckfrage")).show(ctx, |ui| {
@@ -764,7 +848,9 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
             gewaehlt = Some(texte::ABBRECHEN);
         }
     });
-    let Some(wahl) = gewaehlt.map(str::to_string) else { return };
+    let Some(wahl) = gewaehlt.map(str::to_string) else {
+        return;
+    };
     app.einfach.frage = None;
     match frage {
         Frage::Ungespeichert { danach } => match wahl.as_str() {
@@ -786,6 +872,13 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
             if wahl == knopf.as_str() {
                 app.run_or_alert(&befehl, params);
             }
+        }
+        Frage::Wiederherstellen { .. } => {
+            if wahl == "Wiederherstellen" && !crate::sicherung::wiederherstellen(app) {
+                app.message = Some((texte::HINWEIS_TITEL.into(), "Die Sicherung ließ sich leider nicht öffnen.".into()));
+            }
+            // Ab jetzt gehört die Sicherung dieser Sitzung (oder sie ist erledigt).
+            app.einfach.sicherung.loeschen();
         }
     }
 }

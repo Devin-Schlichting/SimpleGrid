@@ -59,7 +59,12 @@ impl eframe::App for App {
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.1.show(&mut self.0, ui);
+        // SimpleGrid: ein unerwarteter Fehler beendet das Programm nicht; die Tabelle wird gesichert.
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.1.show(&mut self.0, ui)));
+        if r.is_err() {
+            log::error!("Unerwarteter Fehler beim Zeichnen; Tabelle wird gesichert");
+            simplegrid_ui_egui::sicherung::nach_fehler(&mut self.0);
+        }
     }
     fn on_exit(&mut self) {
         print::finish_pending_jobs();
@@ -318,11 +323,18 @@ fn main() -> eframe::Result<()> {
     load_prefs(&mut app);
     simplegrid_ui_egui::einfach::deutsche_vorgaben(&mut app.session);
     simplegrid_engine::core::locale::set_german(true);
+    if prefs_enabled() {
+        app.einfach.sicherung = simplegrid_ui_egui::sicherung::Sicherung::neu(simplegrid_ui_egui::sicherung::standard_ordner());
+    }
     // Stamp the startup workbook's author from the persisted user name.
     if app.session.documents().is_empty() {
         app.session.new_workbook();
     }
     app.after_engine(); // Show warnings from the sample.
+    // SimpleGrid: Wiederherstellung nach Absturz anbieten oder die letzte Tabelle öffnen.
+    if files.is_empty() && sample.is_none() {
+        simplegrid_ui_egui::einfach::beim_start(&mut app);
+    }
     // Files named on the command line (a double-click on Windows and Linux) open as File › Open
     // opens them: a password-protected one asks for its password, and errors are shown, not
     // only logged. Each replaces the untouched blank Book1, as a file opened from Finder does.

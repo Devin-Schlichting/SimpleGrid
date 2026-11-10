@@ -9,6 +9,7 @@ description = "SimpleGrid egui frontend (Excel-style UI); swappable — nothing 
 workspace = true
 
 [dependencies]
+chrono = { workspace = true }
 # The shared capture slot (`craft_ui::capture`) comes from the one craft-libs revision every
 # craft-libs dependency uses (see the root Cargo.toml).
 craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "1b34eba41e62138fc2438d2734523b302840b45d" }
