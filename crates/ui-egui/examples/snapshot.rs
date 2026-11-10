@@ -20,6 +20,7 @@ fn main() {
     let mut cmds: Vec<String> = vec![];
     let mut tab = None;
     let mut dark = false;
+    let mut seitenansicht = false;
     let mut pane: Option<String> = None;
     let mut chart: Option<u32> = None;
     let mut dialog: Option<String> = None;
@@ -59,6 +60,8 @@ fn main() {
                 tab = args.get(i).cloned();
             }
             "--dark" => dark = true,
+            // SimpleGrid: die Seitenansicht (Druckvorschau) zeigen.
+            "--seitenansicht" => seitenansicht = true,
             "--pane" => {
                 i += 1;
                 pane = args.get(i).cloned();
@@ -117,6 +120,9 @@ fn main() {
             {
                 let mut app = SheetApp::new(session, Default::default());
                 app.ui.dark = dark;
+                if seitenansicht {
+                    simplegrid_ui_egui::seitenansicht::oeffnen(&mut app);
+                }
                 if let Some(code) = &language
                     && let Some(l) = simplegrid_ui_egui::i18n::Language::parse(code)
                 {

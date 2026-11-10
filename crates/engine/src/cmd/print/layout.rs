@@ -55,6 +55,8 @@ pub(super) fn known_paper(name: &str) -> Option<(f32, f32)> {
 pub struct SheetLayout {
     pub sheet: usize,
     pub settings: PrintSettings,
+    /// SimpleGrid: Seiten dieses Blatts schwarz-weiß drucken.
+    pub black_white: bool,
     pub page_w: f32,
     pub page_h: f32,
     /// Left, right, top, bottom, header, footer margins in points.
@@ -105,6 +107,10 @@ pub struct PrintOptions {
     pub all_sheets: bool,
     pub range: Option<RangeRef>,
     pub fit_to_page: Option<bool>,
+    /// SimpleGrid: Schwarz-Weiß drucken (`blackWhite`).
+    pub black_white: bool,
+    /// SimpleGrid: keine Kopfzeile, unten mittig „Seite N von M“ (`pageNumbers`).
+    pub page_numbers: bool,
 }
 
 impl PrintOptions {
@@ -118,7 +124,13 @@ impl PrintOptions {
             Some(r) => Some(RangeRef::parse(split_sheet(r).1).ok_or_else(|| bad(cmd, format!("not a range: `{r}`")))?),
             None => None,
         };
-        Ok(PrintOptions { all_sheets, range, fit_to_page: bool_param(p, "fitToPage") })
+        Ok(PrintOptions {
+            all_sheets,
+            range,
+            fit_to_page: bool_param(p, "fitToPage"),
+            black_white: bool_param(p, "blackWhite").unwrap_or(false),
+            page_numbers: bool_param(p, "pageNumbers").unwrap_or(false),
+        })
     }
 }
 
@@ -204,7 +216,14 @@ fn title_span(t: Option<(u32, u32)>, max: u32) -> Option<(u32, u32)> {
 /// Paginates one sheet.
 pub fn layout_sheet(wb: &Workbook, si: usize, opts: &PrintOptions, range_override: Option<RangeRef>) -> Option<SheetLayout> {
     let sh = wb.sheet(si)?;
-    let st = sh.print.clone();
+    let mut st = sh.print.clone();
+    if opts.page_numbers {
+        // SimpleGrid: keine Kopf- und Fußzeilen der Datei, nur die Seitenzahl unten in der Mitte.
+        st.header.clear();
+        st.footer = "&CSeite &P von &N".into();
+        st.different_first = false;
+        st.different_odd_even = false;
+    }
     let (mut pw, mut ph) = paper_size(&st.paper);
     if st.orientation == Orientation::Landscape {
         std::mem::swap(&mut pw, &mut ph);
@@ -236,6 +255,7 @@ pub fn layout_sheet(wb: &Workbook, si: usize, opts: &PrintOptions, range_overrid
     let mut lay = SheetLayout {
         sheet: si,
         settings: st.clone(),
+        black_white: opts.black_white,
         page_w: pw,
         page_h: ph,
         margins,

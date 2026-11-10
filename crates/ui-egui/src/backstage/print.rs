@@ -76,7 +76,7 @@ pub(super) fn print(app: &mut SheetApp, ui: &mut Ui, bs: &mut Backstage, out: &m
             p.rect_filled(rect, 2.0, t.grid_bg);
             p.rect_stroke(rect, 2.0, Stroke::new(1.0, t.ribbon_border), StrokeKind::Inside);
             if let Some(d) = app.session.active() {
-                paint_page(p, rect, w, page, &d.wb, &t);
+                paint_page(p, rect, w, page, &d.wb, false);
             }
             let sheet = page.get("sheet").and_then(Json::as_str).unwrap_or("");
             let range = page.get("range").and_then(Json::as_str).unwrap_or("");
@@ -105,12 +105,14 @@ const PREVIEW_ROWS: u32 = 200;
 
 const PREVIEW_COLS: u32 = 60;
 
-/// Draws one printed page in miniature: the cells' displayed text at the page's print scale,
-/// inside the sheet's margins. `paper_w` is the page width in points.
-fn paint_page(p: &egui::Painter, rect: Rect, paper_w: f32, page: &Json, wb: &simplegrid_engine::model::Workbook, t: &Tokens) {
-    let Some(range) = page.get("range").and_then(Json::as_str).and_then(simplegrid_engine::core::RangeRef::parse) else { return };
+/// Draws one printed page in miniature: fills, borders and the cells' displayed text at the
+/// page's print scale, inside the sheet's margins. Merged cells are drawn as one. `paper_w` is the
+/// page width in points. `mono` shows it as the black-and-white print does (SimpleGrid).
+pub(crate) fn paint_page(p: &egui::Painter, rect: Rect, paper_w: f32, page: &Json, wb: &simplegrid_engine::model::Workbook, mono: bool) {
+    use simplegrid_engine::core::{CellRef, RangeRef};
+    use simplegrid_engine::model::{BorderStyle, PatternType};
+    let Some(range) = page.get("range").and_then(Json::as_str).and_then(RangeRef::parse) else { return };
     let Some(sh) = page.get("sheet").and_then(Json::as_str).and_then(|n| wb.sheet_index(n)).and_then(|i| wb.sheets.get(i)) else { return };
-    // Preview pixels per point, and per sheet pixel (sheet geometry is 96 dpi: 0.75 pt per pixel).
     let per_pt = rect.width() / paper_w;
     let print_scale =
         page.get("scale").and_then(Json::as_f64).filter(|s| s.is_finite() && *s > 0.0).map_or(1.0, |s| (s / 100.0) as f32).clamp(0.1, 4.0);
@@ -124,47 +126,100 @@ fn paint_page(p: &egui::Painter, rect: Rect, paper_w: f32, page: &Json, wb: &sim
     if !body.is_positive() {
         return;
     }
-    let font = theme::ui_font((11.0 * per_pt * print_scale).clamp(3.0, 14.0));
     let last_row = range.end.row.min(range.start.row.saturating_add(PREVIEW_ROWS));
     let last_col = range.end.col.min(range.start.col.saturating_add(PREVIEW_COLS));
+    // Positions of the row and column starts on the page.
+    let mut ys = Vec::new();
     let mut y = body.top();
+    for row in range.start.row..=last_row.saturating_add(1) {
+        ys.push(y);
+        y += sh.row_height(row) * per_px;
+    }
+    let mut xs = Vec::new();
+    let mut x = body.left();
+    for col in range.start.col..=last_col.saturating_add(1) {
+        xs.push(x);
+        x += sh.col_width(col) * per_px;
+    }
+    let cell_rect = |r0: u32, c0: u32, r1: u32, c1: u32| -> Option<Rect> {
+        let i0 = (r0.checked_sub(range.start.row)?) as usize;
+        let j0 = (c0.checked_sub(range.start.col)?) as usize;
+        let i1 = (r1.min(last_row).checked_sub(range.start.row)? + 1) as usize;
+        let j1 = (c1.min(last_col).checked_sub(range.start.col)? + 1) as usize;
+        Some(Rect::from_min_max(pos2(*xs.get(j0)?, *ys.get(i0)?), pos2(*xs.get(j1)?, *ys.get(i1)?)))
+    };
+    let ink = |c: egui::Color32| if mono { egui::Color32::BLACK } else { c };
+    let paper = |c: egui::Color32| {
+        if !mono {
+            return c;
+        }
+        let lum = 0.299 * f32::from(c.r()) + 0.587 * f32::from(c.g()) + 0.114 * f32::from(c.b());
+        let g = (255.0 - (255.0 - lum) * 0.3).round().clamp(0.0, 255.0) as u8;
+        egui::Color32::from_gray(g)
+    };
+    let rgb = |c: simplegrid_engine::model::Color| c.resolve(&wb.theme).map(theme::color32);
+    let font = theme::ui_font((11.0 * per_pt * print_scale).clamp(3.0, 40.0));
+    let p = p.with_clip_rect(body);
     for row in range.start.row..=last_row {
-        let h = sh.row_height(row) * per_px;
-        if h <= 0.0 {
-            continue;
-        }
-        if y >= body.bottom() {
-            break;
-        }
-        let mut x = body.left();
         for col in range.start.col..=last_col {
-            let w = sh.col_width(col) * per_px;
-            if w <= 0.0 {
+            let cell = CellRef::new(row, col);
+            // A merged area is drawn from its top-left cell; the other cells are covered.
+            let merge = sh.merges.iter().find(|m| m.contains(cell)).copied();
+            if merge.is_some_and(|m| m.start != cell) {
                 continue;
             }
-            if x >= body.right() {
-                break;
+            let area = merge.unwrap_or(RangeRef::cell(cell));
+            let Some(r) = cell_rect(area.start.row, area.start.col, area.end.row, area.end.col) else { continue };
+            if r.width() <= 0.0 || r.height() <= 0.0 {
+                continue;
             }
-            let cell = simplegrid_engine::core::CellRef::new(row, col);
-            let text = simplegrid_engine::display::cell_text(wb, sh, cell);
-            if !text.is_empty() {
-                let numeric = sh.value(cell).as_f64().is_some();
-                // Text runs on over empty neighbours, as on the sheet; numbers stay in their cell.
-                let mut span = w;
-                if !numeric {
-                    let mut next = col.saturating_add(1);
-                    while next <= last_col && x + span < body.right() && sh.value(simplegrid_engine::core::CellRef::new(row, next)).is_empty() {
-                        span += sh.col_width(next) * per_px;
-                        next = next.saturating_add(1);
-                    }
+            let st = wb.styles.get(sh.style_id(cell));
+            if st.fill.pattern == PatternType::Solid
+                && let Some(c) = rgb(st.fill.fg)
+            {
+                p.rect_filled(r, 0.0, paper(c));
+            }
+            for (line, a, b) in [
+                (&st.borders.top, r.left_top(), r.right_top()),
+                (&st.borders.bottom, r.left_bottom(), r.right_bottom()),
+                (&st.borders.left, r.left_top(), r.left_bottom()),
+                (&st.borders.right, r.right_top(), r.right_bottom()),
+            ] {
+                if line.style != BorderStyle::None {
+                    let w = match line.style {
+                        BorderStyle::Thick => 2.2,
+                        BorderStyle::Medium => 1.5,
+                        _ => 0.8,
+                    } * per_pt.max(0.5);
+                    p.line_segment([a, b], egui::Stroke::new(w, ink(rgb(line.color).unwrap_or(egui::Color32::BLACK))));
                 }
-                let clip = Rect::from_min_size(pos2(x, y), vec2(span, h)).intersect(body);
-                let (anchor, at) =
-                    if numeric { (Align2::RIGHT_CENTER, pos2(x + w - 1.0, y + h / 2.0)) } else { (Align2::LEFT_CENTER, pos2(x + 1.0, y + h / 2.0)) };
-                p.with_clip_rect(clip).text(at, anchor, text, font.clone(), t.cell_text);
             }
-            x += w;
+            let text = simplegrid_engine::display::cell_text(wb, sh, cell);
+            if text.is_empty() {
+                continue;
+            }
+            let numeric = sh.value(cell).as_f64().is_some();
+            let color = ink(rgb(st.font.color).unwrap_or(egui::Color32::BLACK));
+            let f = if st.font.bold { theme::ui_bold(font.size * st.font.size / 11.0) } else { theme::ui_font(font.size * st.font.size / 11.0) };
+            let (anchor, at) = match st.align.h {
+                simplegrid_engine::model::HAlign::Center => (Align2::CENTER_CENTER, r.center()),
+                simplegrid_engine::model::HAlign::Right => (Align2::RIGHT_CENTER, pos2(r.right() - 1.0, r.center().y)),
+                simplegrid_engine::model::HAlign::Left => (Align2::LEFT_CENTER, pos2(r.left() + 1.0, r.center().y)),
+                _ if numeric => (Align2::RIGHT_CENTER, pos2(r.right() - 1.0, r.center().y)),
+                _ => (Align2::LEFT_CENTER, pos2(r.left() + 1.0, r.center().y)),
+            };
+            // Text runs on over empty neighbours, as on the sheet; numbers stay in their cell.
+            let mut clip = r;
+            if !numeric && merge.is_none() {
+                let mut next = col.saturating_add(1);
+                while next <= last_col && sh.value(CellRef::new(row, next)).is_empty() {
+                    if let Some(n) = cell_rect(row, next, row, next) {
+                        clip = clip.union(n);
+                    }
+                    next = next.saturating_add(1);
+                }
+            }
+            p.with_clip_rect(clip.intersect(body)).text(at, anchor, text, f, color);
         }
-        y += h;
     }
 }

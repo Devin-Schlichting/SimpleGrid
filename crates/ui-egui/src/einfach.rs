@@ -71,6 +71,8 @@ pub struct Zustand {
     pub rahmen_dicke: String,
     /// Gewählte Farbe der Umrandung (`#RRGGBB`); leer heißt schwarz.
     pub rahmen_farbe: String,
+    /// Die offene Seitenansicht (Druckvorschau), falls gezeigt.
+    pub seitenansicht: Option<crate::seitenansicht::Seitenansicht>,
 }
 
 /// Schriftgrößen zur Auswahl (feste Stufen).
@@ -97,6 +99,24 @@ pub fn uebersetzung(text: &str) -> Option<&'static str> {
         "Theme Colors" => "Farben",
         "Standard Colors" => "Kräftige Farben",
         "Recent Colors" => "Zuletzt benutzt",
+        "Printer" => "Drucker",
+        "Select a printer" => "Drucker wählen",
+        "Refresh printers" => "Drucker neu suchen",
+        "Copies" => "Anzahl",
+        "Two-sided printing" => "Beidseitig drucken",
+        "Printer default" => "Wie am Drucker eingestellt",
+        "One-sided" => "Einseitig",
+        "Two-sided: long edge" => "Beidseitig (lange Kante)",
+        "Two-sided: short edge" => "Beidseitig (kurze Kante)",
+        "Grayscale" => "Graustufen",
+        "Finding printers…" => "Drucker werden gesucht …",
+        "No printers found. Configure a system printer or export a PDF." => "Kein Drucker gefunden. Bitte einen Drucker in Windows einrichten oder als PDF speichern.",
+        "Printer discovery failed." => "Die Druckersuche hat nicht geklappt.",
+        "Submitting print job…" => "Wird an den Drucker geschickt …",
+        "Print job submitted." => "Wurde an den Drucker geschickt.",
+        "Print job submitted: {receipt}" => "Wurde an den Drucker geschickt: {receipt}",
+        "Print failed: {error}" => "Drucken hat nicht geklappt: {error}",
+        "Print failed: the printing worker stopped." => "Drucken hat nicht geklappt.",
         _ => return None,
     })
 }
@@ -175,6 +195,7 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
             gruppe(ui, "Zellen", |ui| zellen(app, ui));
             gruppe(ui, "Umrandung", |ui| umrandung(app, ui));
             gruppe(ui, "Ansicht", |ui| ansicht(app, ui));
+            gruppe(ui, "Drucken", |ui| drucken(app, ui));
             gruppe(ui, "Tabellenblatt", |ui| blaetter(app, ui));
         }).response);
         gemessen = r.content_size.y + 16.0;
@@ -570,6 +591,25 @@ pub fn summe(app: &mut SheetApp) {
             app.run_or_alert("selection.set", json!({"cell": zelle.a1()}));
         }
         None => app.run_or_alert("formulas.autoSum", json!({})),
+    }
+}
+
+fn drucken(app: &mut SheetApp, ui: &mut Ui) {
+    let ohne = gesperrt(app, "pageLayout.printArea").map(|_| texte::NICHT_MOEGLICH);
+    if knopf(ui, "Seitenansicht und Drucken", "Zeigen, wie die Seiten gedruckt aussehen, und dann drucken", ohne, false) {
+        crate::seitenansicht::oeffnen(app);
+    }
+    if knopf(ui, "Druckbereich festlegen", "Nur die markierten Zellen drucken", ohne, false) {
+        app.run_or_alert("pageLayout.printArea", json!({}));
+    }
+    let bereich = app.session.active().and_then(|d| d.wb.active().and_then(|s| s.print.print_area)).map(|r| r.a1());
+    let aufheben_aus = if bereich.is_some() { ohne } else { Some("Es ist kein Druckbereich festgelegt: gedruckt wird alles, was auf dem Blatt steht.") };
+    let tipp = match &bereich {
+        Some(b) => format!("Wieder alles drucken statt nur {b}"),
+        None => "Wieder alles drucken".into(),
+    };
+    if knopf(ui, "Druckbereich aufheben", &tipp, aufheben_aus, false) {
+        app.run_or_alert("pageLayout.printArea", json!({"clear": true}));
     }
 }
 

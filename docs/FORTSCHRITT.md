@@ -81,3 +81,16 @@
 - Neuberechnung, Abhängigkeiten und Zirkelbezüge macht die GridCraft-Engine (Zirkel → `#ZIRKEL!`, keine Endlosschleife).
 - Tests: deutsche Formeln ↔ gespeicherte Schreibweise, Punkt-vor-Strich, Klammern, Fehlerketten, Zirkel,
   Bezugsänderung durch Einfügen/Löschen, Summe in beiden Richtungen und von einer Zelle aus, SUM in der .xlsx.
+
+## Phase 7 – Drucken (2026-11-10)
+- Leiste „Drucken“: Seitenansicht und Drucken, Druckbereich festlegen, Druckbereich aufheben (gesperrt, wenn keiner da).
+- Neue Seitenansicht (`crates/ui-egui/src/seitenansicht.rs`) statt GridCraft's Backstage: große Seite mit Füllungen,
+  Rahmen, verbundenen Zellen und Seitenzahl; Blättern, Vorschau-Zoom 100–300 %; Hochformat/Querformat,
+  „Auf eine Seite“, Farbe/Schwarz-Weiß; Drucken, Als PDF speichern; Druckerwahl (GridCraft, eingedeutscht).
+- Seitenaufteilung, PDF-Erzeugung und Druck stammen aus GridCraft (Umbruch nur an Zeilen-/Spaltengrenzen).
+- Neu in der Engine: Druckoptionen `pageNumbers` (keine Kopfzeile, unten „Seite N von M“) und `blackWhite`
+  (PDF-Seiten: Flächen in hellen Graustufen, Schrift und Linien schwarz).
+- Druckbereich, Ausrichtung und „Auf eine Seite“ werden im Blatt und damit in der .xlsx gespeichert.
+- Leeres Blatt: „Auf diesem Blatt steht nichts zum Drucken.“ statt einer leeren Seite.
+- Tests: Seitenzahl hoch/quer/eine Seite, jede Zeile genau einmal gedruckt, Druckbereich, Fußzeile, Schwarz-Weiß im
+  PDF, Speichern der Druckeinstellungen. Noch offen: praktischer Probedruck auf einem echten Drucker.

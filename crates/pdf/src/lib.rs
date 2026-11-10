@@ -380,6 +380,8 @@ pub struct Page {
     images: Vec<ImageData>,
     links: Vec<LinkAnnotation>,
     depth: u32,
+    /// SimpleGrid: Schwarz-Weiß-Druck (Flächen hellgrau, Linien und Schrift schwarz).
+    mono: bool,
 }
 
 /// Most bytes of content per page before further drawing is dropped (keeps hostile inputs from
@@ -391,6 +393,24 @@ const MAX_PAGE_LINKS: usize = 4096;
 const MAX_LINK_URI_BYTES: usize = 4096;
 
 impl Page {
+    /// SimpleGrid: Schwarz-Weiß-Druck ein- oder ausschalten (gilt für alles, was danach gezeichnet wird).
+    pub fn set_monochrome(&mut self, on: bool) {
+        self.mono = on;
+    }
+    /// Farbe für Linien und Schrift: im Schwarz-Weiß-Druck schwarz.
+    fn ink(&self, c: Rgb) -> Rgb {
+        if self.mono { [0, 0, 0] } else { c }
+    }
+    /// Farbe für Flächen: im Schwarz-Weiß-Druck ein helles Grau gleicher Abstufung, damit
+    /// schwarze Schrift darauf lesbar bleibt (Weiß bleibt Weiß, Schwarz wird mittelhell).
+    fn paper(&self, c: Rgb) -> Rgb {
+        if !self.mono {
+            return c;
+        }
+        let lum = 0.299 * f32::from(c[0]) + 0.587 * f32::from(c[1]) + 0.114 * f32::from(c[2]);
+        let g = (255.0 - (255.0 - lum) * 0.3).round().clamp(0.0, 255.0) as u8;
+        [g, g, g]
+    }
     pub fn width(&self) -> f32 {
         self.width
     }
@@ -469,7 +489,7 @@ impl Page {
         if !(extent(w) && extent(h) && finite(&[x, y])) {
             return;
         }
-        let s = format!("{}\n{} {} {} {} re f", rgb_op(color, false), n(x), n(self.y(y + h)), n(w), n(h));
+        let s = format!("{}\n{} {} {} {} re f", rgb_op(self.paper(color), false), n(x), n(self.y(y + h)), n(w), n(h));
         self.op(&s);
     }
 
@@ -477,7 +497,7 @@ impl Page {
         if !finite(&[x, y, w, h]) {
             return;
         }
-        let s = format!("{}\n{} w [] 0 d\n{} {} {} {} re S", rgb_op(color, true), n(stroke_width(width)), n(x), n(self.y(y + h)), n(w), n(h));
+        let s = format!("{}\n{} w [] 0 d\n{} {} {} {} re S", rgb_op(self.ink(color), true), n(stroke_width(width)), n(x), n(self.y(y + h)), n(w), n(h));
         self.op(&s);
     }
 
@@ -492,7 +512,7 @@ impl Page {
         }
         let s = format!(
             "{}\n{} w [{}] 0 d\n{} {} m {} {} l S",
-            rgb_op(color, true),
+            rgb_op(self.ink(color), true),
             n(stroke_width(width)),
             dash_values(dash),
             n(start.x),
@@ -508,7 +528,7 @@ impl Page {
         if pts.len() < 2 || !pts.iter().all(|p| finite(p)) {
             return;
         }
-        let mut s = format!("{}\n{} w [{}] 0 d 1 j\n", rgb_op(color, true), n(stroke_width(width)), dash_values(dash));
+        let mut s = format!("{}\n{} w [{}] 0 d 1 j\n", rgb_op(self.ink(color), true), n(stroke_width(width)), dash_values(dash));
         self.path(&mut s, pts, false);
         s.push_str(" S");
         self.op(&s);
@@ -530,11 +550,11 @@ impl Page {
         }
         let mut s = String::new();
         if let Some(f) = fill {
-            s.push_str(&rgb_op(f, false));
+            s.push_str(&rgb_op(self.paper(f), false));
             s.push('\n');
         }
         if let Some((c, w)) = stroke {
-            let _ = writeln!(s, "{}\n{} w [] 0 d 1 j", rgb_op(c, true), n(stroke_width(w)));
+            let _ = writeln!(s, "{}\n{} w [] 0 d 1 j", rgb_op(self.ink(c), true), n(stroke_width(w)));
         }
         self.path(&mut s, pts, true);
         s.push_str(match (fill.is_some(), stroke.is_some()) {
@@ -555,11 +575,11 @@ impl Page {
         let y = self.y(cy);
         let mut s = String::new();
         if let Some(f) = fill {
-            s.push_str(&rgb_op(f, false));
+            s.push_str(&rgb_op(self.paper(f), false));
             s.push('\n');
         }
         if let Some((c, w)) = stroke {
-            let _ = writeln!(s, "{}\n{} w [] 0 d", rgb_op(c, true), n(stroke_width(w)));
+            let _ = writeln!(s, "{}\n{} w [] 0 d", rgb_op(self.ink(c), true), n(stroke_width(w)));
         }
         let _ = write!(
             s,
@@ -614,7 +634,7 @@ impl Page {
         let size = n(size.min(10_000.0));
         let (sn, cs) = if angle.is_finite() { angle.sin_cos() } else { (0.0, 1.0) };
         // Clockwise in y-down = counter-clockwise negated in PDF's y-up space.
-        let mut s = format!("BT\n{}\n{} {} {} {} {} {} Tm\n", rgb_op(color, false), n(cs), n(-sn), n(sn), n(cs), n(origin.x), n(self.y(origin.y)));
+        let mut s = format!("BT\n{}\n{} {} {} {} {} {} Tm\n", rgb_op(self.ink(color), false), n(cs), n(-sn), n(sn), n(cs), n(origin.x), n(self.y(origin.y)));
         // Symbol text is one run in Symbol's own encoding (the CID font has no maths symbols).
         if font == Font::Symbol {
             if let Some(f) = self.fonts.get_mut(fi) {
@@ -747,7 +767,7 @@ impl PdfDoc {
     pub fn add_page(&mut self, width_pt: f32, height_pt: f32) -> &mut Page {
         let width = if width_pt.is_finite() { width_pt.clamp(3.0, 14_400.0) } else { 612.0 };
         let height = if height_pt.is_finite() { height_pt.clamp(3.0, 14_400.0) } else { 792.0 };
-        self.pages.push(Page { width, height, content: String::new(), fonts: [false; FONT_SLOTS], images: Vec::new(), links: Vec::new(), depth: 0 });
+        self.pages.push(Page { width, height, content: String::new(), fonts: [false; FONT_SLOTS], images: Vec::new(), links: Vec::new(), depth: 0, mono: false });
         let i = self.pages.len() - 1;
         &mut self.pages[i]
     }
@@ -950,3 +970,36 @@ impl PdfDoc {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod schwarz_weiss_tests {
+    use super::*;
+
+    fn seite(mono: bool) -> String {
+        let mut doc = PdfDoc::new();
+        let pg = doc.add_page(200.0, 200.0);
+        pg.set_monochrome(mono);
+        pg.fill_rect(10.0, 10.0, 50.0, 20.0, [0x30, 0x54, 0x96]);
+        pg.stroke_line(0.0, 0.0, 10.0, 10.0, 1.0, [255, 0, 0]);
+        pg.text(10.0, 50.0, 11.0, Font::Helvetica, [0, 0, 255], "Haushalt");
+        String::from_utf8_lossy(&doc.finish()).into_owned()
+    }
+
+    #[test]
+    fn farbe_bleibt_farbig() {
+        let pdf = seite(false);
+        assert!(pdf.contains("1 0 0 RG"), "rote Linie");
+        assert!(pdf.contains("0 0 1 rg"), "blaue Schrift");
+    }
+
+    #[test]
+    fn schwarz_weiss_macht_flaechen_hell_und_schrift_schwarz() {
+        let pdf = seite(true);
+        assert!(!pdf.contains("1 0 0 RG") && !pdf.contains("0 0 1 rg"), "keine Farben mehr");
+        assert!(pdf.contains("0 0 0 RG"), "Linie schwarz");
+        assert!(pdf.contains("0 0 0 rg"), "Schrift schwarz");
+        // Dunkelblauer Hintergrund (Helligkeit ~80) wird ein helles Grau (~202 → 0,79).
+        assert!(pdf.contains("0.792 0.792 0.792 rg") || pdf.contains("0.788 0.788 0.788 rg") || pdf.contains("0.796 0.796 0.796 rg"), "{pdf}");
+    }
+}
+

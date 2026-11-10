@@ -16,7 +16,7 @@ impl SheetApp {
 
     /// Asks for a `.pdf` path with the save picker, then re-runs `file.exportPdf` with it. Other
     /// params (range, sheets, fitToPage) are kept. A cancelled picker does nothing.
-    pub(super) fn export_pdf_with_picker(&mut self, mut params: Json) {
+    pub(crate) fn export_pdf_with_picker(&mut self, mut params: Json) {
         if !self.commit_edit(0, 0, false, false) {
             return;
         }

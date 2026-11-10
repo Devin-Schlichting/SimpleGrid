@@ -220,6 +220,9 @@ impl SheetApp {
         // Die feste Schaltflächenleiste ersetzt alles; nur das Druckfenster nutzt die Backstage noch.
         if self.backstage.is_some() {
             backstage::show(self, ui);
+        } else if self.einfach.seitenansicht.is_some() {
+            // SimpleGrid: die Seitenansicht ersetzt Leiste und Tabelle, bis sie geschlossen wird.
+            crate::seitenansicht::zeigen(self, ui);
         } else {
             einfach::leiste(self, ui);
             widgets::notice_bar(self, ui);

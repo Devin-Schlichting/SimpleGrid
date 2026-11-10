@@ -22,6 +22,7 @@ use crate::theme::{self, Tokens};
 
 mod options;
 mod print;
+pub(crate) use print::paint_page;
 
 use options::{options, platform};
 use print::print;
