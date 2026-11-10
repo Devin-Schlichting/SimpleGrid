@@ -137,3 +137,13 @@
 - Stille Deinstallation: Ordner, Verknüpfungen, Registry-Eintrag, Einstellungen und Sicherungen entfernt.
 - Fenstertitel jetzt „Mappe1 – SimpleGrid“ bzw. „… (nicht gespeichert) – SimpleGrid“ (vorher englisch „— Edited“).
 - Noch offen: Probe-Update über zwei echte GitHub-Releases (braucht Push und Release).
+
+### Nachtrag Phase 9 – Update-Probelauf über GitHub (2026-11-10)
+- Code nach `Devin-Schlichting/SimpleGrid` hochgeladen; GitHub-Aktion hat Release `v0.1.0` und `v0.1.1` gebaut
+  (Build, alle Tests, Installer, `versionen.json`; je ca. 27 Minuten).
+- v0.1.0 aus der Release installiert (Prüfsumme stimmt). Beim Start meldete sie selbst
+  „Es gibt eine neue Version von SimpleGrid (0.1.1). Jetzt aktualisieren?“ → Klick → Installer geladen, geprüft,
+  still installiert, Programm neu gestartet. Info-Fenster zeigt „Version 0.1.1“; „Nach Updates suchen“ meldet
+  „Sie haben bereits die neueste Version (0.1.1).“
+- Beobachtet für Phase 10: SimpleGrid folgt dem dunklen Windows-Design; Meldungsfenster sind noch klein.
+- Die GitHub-Aktion warnt, dass `actions/checkout@v4` auf Node 20 läuft (nur Hinweis, kein Fehler).
