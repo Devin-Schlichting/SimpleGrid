@@ -4605,7 +4605,7 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
 name = "simplegrid"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arboard",
  "chrono",
@@ -4631,7 +4631,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-calc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "log",
  "simplegrid-core",
@@ -4643,7 +4643,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-chart"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "simplegrid-calc",
@@ -4654,7 +4654,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "js-sys",
@@ -4665,7 +4665,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image",
  "log",
@@ -4688,7 +4688,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-formula"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "simplegrid-core",
@@ -4697,7 +4697,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-functions"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "regex",
  "simplegrid-core",
@@ -4705,7 +4705,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-math"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ratex-font",
  "ratex-layout",
@@ -4715,7 +4715,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-mcp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "log",
  "serde_json",
@@ -4724,7 +4724,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-model"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4737,18 +4737,18 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-numfmt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "simplegrid-core",
 ]
 
 [[package]]
 name = "simplegrid-pdf"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "simplegrid-ui-egui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "craft-ui",
@@ -4777,7 +4777,7 @@ dependencies = [
 
 [[package]]
 name = "simplegrid-xlsx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes",
  "quick-xml",
