@@ -641,7 +641,14 @@ pub(super) fn form_fields(app: &SheetApp, ui: &mut egui::Ui, d: &mut Dialog) {
                         let mut n = d.values.get(key).and_then(Json::as_f64).unwrap_or(0.0);
                         // Typed values count straight away: otherwise Enter or OK in the same frame
                         // confirms the old value, because a number field only commits when it loses focus.
-                        let r = ui.add(egui::DragValue::new(&mut n).speed(0.5).update_while_editing(true)).labelled_by(label.id);
+                        let mut field = egui::DragValue::new(&mut n).speed(0.5).update_while_editing(true);
+                        // SimpleGrid: Zahlen mit Dezimalkomma anzeigen und lesen.
+                        if simplegrid_engine::core::locale::german() {
+                            field = field
+                                .custom_formatter(|v, _| simplegrid_engine::core::locale::localize_number_text(&format!("{}", (v * 100.0).round() / 100.0)))
+                                .custom_parser(|t| t.trim().replace('.', "").replace(',', ".").parse::<f64>().ok());
+                        }
+                        let r = ui.add(field).labelled_by(label.id);
                         take_first_focus(d, &r);
                         if r.changed() {
                             d.values.insert(key.into(), json!(n));

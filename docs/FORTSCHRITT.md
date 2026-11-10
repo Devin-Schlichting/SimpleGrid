@@ -48,3 +48,12 @@
 - Bilder aus der Zwischenablage werden nicht mehr eingefügt (nur Zellen und Text).
 - Tests: Eingabe/Löschen/Rückgängig/Wiederholen, 50 Schritte, Kopieren mit Format auf anderes Blatt, Ausschneiden,
   tabgetrennter Text aus anderen Programmen mit deutschen Zahlen.
+
+## Phase 4 – Zeilen und Spalten (2026-11-10)
+- Leiste „Zeilen und Spalten“: Zeile/Spalte hinzufügen und entfernen (an der Markierung, auch mehrere), Spaltenbreite …,
+  Zeilenhöhe … (GridCraft-Dialoge, eingedeutscht, Zahlen mit Komma). Ziehen an den Kopflinien geht wie bisher.
+- Entfernen fragt nur, wenn in den Zeilen/Spalten Daten stehen; alles ist rückgängig machbar.
+- Formelbezüge, Formate, Breiten, verbundene Zellen verschieben sich (GridCraft-Engine); gelöschte Bezüge → `#REF!`
+  (deutsche Fehlernamen folgen in Phase 6).
+- Leiste bricht Gruppen in neue Zeilen um, ist so hoch wie nötig, höchstens 40 % des Fensters (sonst rollbar).
+- Hinweis für Phase 10: Mit allen Gruppen wird die Leiste mehrzeilig – Anordnung ist eine Designfrage.

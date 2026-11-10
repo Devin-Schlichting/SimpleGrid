@@ -203,7 +203,7 @@ impl Language {
             Self::Ko => ko::translate(text),
             Self::Ru => ru::translate(text),
             Self::PtBr => pt::translate(text),
-            Self::De => de::translate(text),
+            Self::De => crate::einfach::uebersetzung(text).or_else(|| de::translate(text)),
             Self::Cs => cs::translate(text),
             Self::Fr => fr::translate(text),
             Self::Sr => sr::translate(text),

@@ -59,12 +59,32 @@ pub enum Frage {
     Ungespeichert { danach: Danach },
     /// Ein Tabellenblatt wirklich löschen?
     BlattLoeschen { blatt: usize, name: String },
+    /// Eine Aktion, die Daten entfernt, erst nach Bestätigung ausführen.
+    Bestaetigen { titel: String, text: String, knopf: String, befehl: String, params: Json },
 }
 
 /// Zustand der einfachen Oberfläche.
 #[derive(Clone, Debug, Default)]
 pub struct Zustand {
     pub frage: Option<Frage>,
+}
+
+/// Deutsche Texte für übernommene GridCraft-Dialoge, die die allgemeine Übersetzung nicht kennt
+/// oder anders (einfacher) heißen sollen. Wird vor `i18n::de` gefragt.
+pub fn uebersetzung(text: &str) -> Option<&'static str> {
+    Some(match text {
+        "Column Width" => "Spaltenbreite",
+        "Column width (characters):" => "Spaltenbreite (Zeichen):",
+        "Row Height" => "Zeilenhöhe",
+        "Row height (points):" => "Zeilenhöhe (Punkt):",
+        "Cancel" => "Abbrechen",
+        "OK" => "OK",
+        "Save" => "Speichern",
+        "Don't Save" => "Nicht speichern",
+        "Close" => "Schließen",
+        "Ready" => "Bereit",
+        _ => return None,
+    })
 }
 
 /// Der Grund, warum Befehl `id` gerade nicht geht, oder `None`, wenn er geht.
@@ -94,10 +114,17 @@ fn befehl(app: &mut SheetApp, ui: &mut Ui, text: &str, tipp: &str, id: &str, par
     }
 }
 
-/// Eine Gruppe von Schaltflächen mit kleiner Überschrift.
+/// Eine Gruppe von Schaltflächen mit kleiner Überschrift. Passt sie nicht mehr in die Zeile,
+/// beginnt sie eine neue (die Breite stammt aus dem vorigen Bild).
 fn gruppe(ui: &mut Ui, titel: &str, inhalt: impl FnOnce(&mut Ui)) {
     let t = Tokens::get(ui.ctx());
-    egui::Frame::NONE.fill(t.ribbon).stroke(egui::Stroke::new(1.0, t.ribbon_border)).corner_radius(8.0).inner_margin(6.0).show(ui, |ui| {
+    let id = egui::Id::unique(("simplegrid_gruppe", titel));
+    let breite: Option<f32> = ui.ctx().data(|d| d.get_temp(id));
+    let rest = ui.max_rect().right() - ui.cursor().min.x;
+    if breite.is_some_and(|b| b > rest + 0.5) && ui.cursor().min.x > ui.max_rect().min.x + 1.0 {
+        ui.end_row();
+    }
+    let r = egui::Frame::NONE.fill(t.ribbon).stroke(egui::Stroke::new(1.0, t.ribbon_border)).corner_radius(8.0).inner_margin(6.0).show(ui, |ui| {
         ui.vertical(|ui| {
             ui.label(RichText::new(titel).font(theme::ui_font(masse::GRUPPEN_SCHRIFT)).color(t.text_dim));
             ui.horizontal(|ui| {
@@ -106,19 +133,37 @@ fn gruppe(ui: &mut Ui, titel: &str, inhalt: impl FnOnce(&mut Ui)) {
             });
         });
     });
+    let w = r.response.rect.width();
+    if breite.is_none_or(|b| (b - w).abs() > 0.5) {
+        ui.ctx().data_mut(|d| d.insert_temp(id, w));
+        ui.ctx().request_repaint();
+    }
 }
 
 /// Zeichnet die feste Schaltflächenleiste oben im Fenster.
 pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    egui::Panel::top("simplegrid_leiste").frame(egui::Frame::NONE.fill(t.window).inner_margin(egui::Margin::same(8))).show(ui, |ui| {
-        ui.horizontal_wrapped(|ui| {
+    // Die Leiste ist genau so hoch wie ihr Inhalt im vorigen Bild (Gruppen brechen um).
+    let hoehe_id = egui::Id::unique("simplegrid_leiste_hoehe");
+    let hoehe: f32 = ui.ctx().data(|d| d.get_temp(hoehe_id)).unwrap_or(masse::KNOPF_HOEHE + 48.0);
+    let mut gemessen = hoehe;
+    // Höchstens 40 % der Fensterhöhe, damit die Tabelle auch in kleinen Fenstern sichtbar bleibt;
+    // was nicht passt, lässt sich in der Leiste rollen.
+    let hoechstens = (ui.ctx().content_rect().height() * 0.4).max(masse::KNOPF_HOEHE + 48.0);
+    egui::Panel::top("simplegrid_leiste").resizable(false).exact_size(hoehe.min(hoechstens)).frame(egui::Frame::NONE.fill(t.window).inner_margin(egui::Margin::same(8))).show(ui, |ui| {
+        let r = egui::ScrollArea::vertical().id_salt("simplegrid_leiste_rollen").auto_shrink([false, true]).show(ui, |ui| ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             gruppe(ui, "Datei", |ui| datei(app, ui));
             gruppe(ui, "Bearbeiten", |ui| bearbeiten(app, ui));
+            gruppe(ui, "Zeilen und Spalten", |ui| zeilen_spalten(app, ui));
             gruppe(ui, "Tabellenblatt", |ui| blaetter(app, ui));
+        }).response);
+        gemessen = r.content_size.y + 16.0;
         });
-    });
+    if (gemessen - hoehe).abs() > 0.5 {
+        ui.ctx().data_mut(|d| d.insert_temp(hoehe_id, gemessen));
+        ui.ctx().request_repaint();
+    }
 }
 
 fn datei(app: &mut SheetApp, ui: &mut Ui) {
@@ -246,6 +291,73 @@ fn bearbeiten(app: &mut SheetApp, ui: &mut Ui) {
     befehl(app, ui, "Inhalt löschen", "Den Inhalt der markierten Zellen löschen (auch Entf)", "edit.clearContents", json!({}));
 }
 
+fn zeilen_spalten(app: &mut SheetApp, ui: &mut Ui) {
+    let ohne = gesperrt(app, "home.insertRows").map(|_| texte::NICHT_MOEGLICH);
+    let (zeilen, spalten) = auswahl_zeilen_spalten(app);
+    let mehrzahl = |n: u32, eins: &str, viele: &str| if n > 1 { format!("{n} {viele}") } else { eins.to_string() };
+    if knopf(ui, "Zeile hinzufügen", &format!("{} über der Markierung einfügen", mehrzahl(zeilen.1 - zeilen.0 + 1, "Eine leere Zeile", "leere Zeilen")), ohne, false) {
+        app.run_or_alert("home.insertRows", json!({}));
+    }
+    if knopf(ui, "Zeile entfernen", "Die markierten Zeilen entfernen (mit Rückfrage, wenn Daten darin stehen)", ohne, false) {
+        entfernen(app, true);
+    }
+    if knopf(ui, "Spalte hinzufügen", &format!("{} links neben der Markierung einfügen", mehrzahl(spalten.1 - spalten.0 + 1, "Eine leere Spalte", "leere Spalten")), ohne, false) {
+        app.run_or_alert("home.insertColumns", json!({}));
+    }
+    if knopf(ui, "Spalte entfernen", "Die markierten Spalten entfernen (mit Rückfrage, wenn Daten darin stehen)", ohne, false) {
+        entfernen(app, false);
+    }
+    if knopf(ui, "Spaltenbreite …", "Die Breite der markierten Spalten als Zahl eingeben (man kann auch die Linie im Spaltenkopf ziehen)", ohne, false) {
+        app.open_dialog("columnWidth", json!({}));
+    }
+    if knopf(ui, "Zeilenhöhe …", "Die Höhe der markierten Zeilen als Zahl eingeben (man kann auch die Linie im Zeilenkopf ziehen)", ohne, false) {
+        app.open_dialog("rowHeight", json!({}));
+    }
+}
+
+/// Erste und letzte markierte Zeile sowie Spalte (nullbasiert).
+fn auswahl_zeilen_spalten(app: &SheetApp) -> ((u32, u32), (u32, u32)) {
+    app.session
+        .active()
+        .map(|d| {
+            let r = d.selection.current();
+            ((r.start.row, r.end.row), (r.start.col, r.end.col))
+        })
+        .unwrap_or(((0, 0), (0, 0)))
+}
+
+/// „Zeile entfernen“ / „Spalte entfernen“: stehen Daten darin, erst fragen.
+fn entfernen(app: &mut SheetApp, zeilen: bool) {
+    if !app.commit_edit(0, 0, false, false) {
+        return;
+    }
+    let ((r0, r1), (c0, c1)) = auswahl_zeilen_spalten(app);
+    let hat_daten = app.session.active().and_then(|d| d.wb.active()).is_some_and(|sh| {
+        sh.cells.iter().any(|(c, cell)| !cell.is_blank() && if zeilen { (r0..=r1).contains(&c.row) } else { (c0..=c1).contains(&c.col) })
+    });
+    let befehl = if zeilen { "home.deleteRows" } else { "home.deleteColumns" };
+    if !hat_daten {
+        app.run_or_alert(befehl, json!({}));
+        return;
+    }
+    let was = if zeilen {
+        if r0 == r1 { format!("Die Zeile {}", r0 + 1) } else { format!("Die Zeilen {} bis {}", r0 + 1, r1 + 1) }
+    } else {
+        let name = |c: u32| simplegrid_engine::core::CellRef::new(0, c).a1().trim_end_matches(char::is_numeric).to_string();
+        if c0 == c1 { format!("Die Spalte {}", name(c0)) } else { format!("Die Spalten {} bis {}", name(c0), name(c1)) }
+    };
+    app.einfach.frage = Some(Frage::Bestaetigen {
+        titel: if zeilen { "Zeilen entfernen?".into() } else { "Spalten entfernen?".into() },
+        text: format!(
+            "{was} {} Daten. Wirklich entfernen? Mit „Rückgängig“ können Sie es zurückholen.",
+            if (zeilen && r0 == r1) || (!zeilen && c0 == c1) { "enthält" } else { "enthalten" }
+        ),
+        knopf: "Entfernen".into(),
+        befehl: befehl.into(),
+        params: json!({}),
+    });
+}
+
 fn blaetter(app: &mut SheetApp, ui: &mut Ui) {
     let (aktiv, anzahl, name) = app
         .session
@@ -309,6 +421,7 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
             (texte::UNGESPEICHERT_TITEL, texte::UNGESPEICHERT_TEXT.replace("{}", &name), vec![texte::SPEICHERN, texte::NICHT_SPEICHERN, texte::ABBRECHEN])
         }
         Frage::BlattLoeschen { name, .. } => (texte::BLATT_LOESCHEN_TITEL, texte::BLATT_LOESCHEN_TEXT.replace("{}", name), vec![texte::LOESCHEN, texte::ABBRECHEN]),
+        Frage::Bestaetigen { titel, text, knopf, .. } => (titel.as_str(), text.clone(), vec![knopf.as_str(), texte::ABBRECHEN]),
     };
     let mut gewaehlt: Option<&str> = None;
     egui::Modal::new(egui::Id::unique("simplegrid.rueckfrage")).show(ctx, |ui| {
@@ -329,10 +442,10 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
             gewaehlt = Some(texte::ABBRECHEN);
         }
     });
-    let Some(wahl) = gewaehlt else { return };
+    let Some(wahl) = gewaehlt.map(str::to_string) else { return };
     app.einfach.frage = None;
     match frage {
-        Frage::Ungespeichert { danach } => match wahl {
+        Frage::Ungespeichert { danach } => match wahl.as_str() {
             // Nur weiter, wenn wirklich gespeichert wurde (sonst bleibt alles, wie es war).
             texte::SPEICHERN => {
                 if speichern(app) {
@@ -345,6 +458,11 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
         Frage::BlattLoeschen { blatt, .. } => {
             if wahl == texte::LOESCHEN {
                 app.run_or_alert("home.deleteSheet", json!({"sheet": blatt}));
+            }
+        }
+        Frage::Bestaetigen { knopf, befehl, params, .. } => {
+            if wahl == knopf.as_str() {
+                app.run_or_alert(&befehl, params);
             }
         }
     }
@@ -628,6 +746,86 @@ mod tests {
         assert_eq!(v["text"], json!("12,5"));
         let d = a.session.active().map(|d| simplegrid_engine::display::edit_text(&d.wb, d.wb.active().unwrap_or_else(|| unreachable!()), simplegrid_engine::core::CellRef::new(0, 0)));
         assert_eq!(d.as_deref(), Some("12,5"));
+    }
+
+    fn formel(a: &mut SheetApp, zelle: &str) -> Json {
+        a.session.execute("cell.get", json!({"cell": zelle})).map(|v| v["formula"].clone()).unwrap_or(Json::Null)
+    }
+
+    #[test]
+    fn zeile_einfuegen_passt_formeln_an_und_laesst_sich_zuruecknehmen() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "1"}));
+        a.run_or_alert("cell.set", json!({"cell": "A2", "input": "2"}));
+        a.run_or_alert("cell.set", json!({"cell": "B1", "input": "=A1+A2"}));
+        a.run_or_alert("selection.set", json!({"range": "A1:A2"}));
+        a.run_or_alert("home.insertRows", json!({}));
+        assert_eq!(formel(&mut a, "B3"), json!("=A3+A4"));
+        assert_eq!(wert(&mut a, "B3"), json!(3.0));
+        a.run_or_alert("edit.undo", json!({}));
+        assert_eq!(formel(&mut a, "B1"), json!("=A1+A2"));
+    }
+
+    #[test]
+    fn geloeschter_bezug_ergibt_bezugsfehler() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "5"}));
+        a.run_or_alert("cell.set", json!({"cell": "C1", "input": "=A1*2"}));
+        a.run_or_alert("selection.set", json!({"range": "A1"}));
+        a.run_or_alert("home.deleteColumns", json!({}));
+        assert_eq!(formel(&mut a, "B1"), json!("=#REF!*2"));
+    }
+
+    #[test]
+    fn entfernen_mit_daten_fragt_ohne_daten_nicht() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A2", "input": "Daten"}));
+        a.run_or_alert("selection.set", json!({"range": "A5:B6"}));
+        entfernen(&mut a, true);
+        assert!(a.einfach.frage.is_none(), "leere Zeilen werden ohne Rückfrage entfernt");
+        a.run_or_alert("selection.set", json!({"range": "A2:A3"}));
+        entfernen(&mut a, true);
+        match &a.einfach.frage {
+            Some(Frage::Bestaetigen { text, befehl, .. }) => {
+                assert!(text.starts_with("Die Zeilen 2 bis 3 enthalten Daten"), "{text}");
+                assert_eq!(befehl, "home.deleteRows");
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(wert(&mut a, "A2"), json!("Daten"), "noch nichts entfernt");
+    }
+
+    #[test]
+    fn spalte_verschiebt_breite_verbund_und_format() {
+        let mut a = app();
+        a.run_or_alert("home.columnWidth", json!({"cols": "B", "chars": 20}));
+        a.run_or_alert("cell.set", json!({"cell": "B1", "input": "x"}));
+        a.run_or_alert("home.bold", json!({"range": "B1"}));
+        a.run_or_alert("home.mergeCells", json!({"range": "B2:C2"}));
+        let breite = |a: &SheetApp, c: u32| a.session.active().and_then(|d| d.wb.active().map(|s| s.col_width(c))).unwrap_or(0.0);
+        let b = breite(&a, 1);
+        a.run_or_alert("selection.set", json!({"range": "A1"}));
+        a.run_or_alert("home.insertColumns", json!({}));
+        assert_eq!(breite(&a, 2), b);
+        assert_eq!(wert(&mut a, "C1"), json!("x"));
+        let st = a.session.execute("cell.get", json!({"cell": "C1"})).unwrap_or_default();
+        assert_eq!(st["style"]["font"]["bold"], json!(true));
+        let merges = a.session.active().and_then(|d| d.wb.active().map(|s| s.merges.iter().map(|m| m.a1()).collect::<Vec<_>>())).unwrap_or_default();
+        assert_eq!(merges, ["C2:D2"]);
+    }
+
+    #[test]
+    fn spaltenbreite_und_zeilenhoehe_rueckgaengig() {
+        let mut a = app();
+        let breite = |a: &SheetApp| a.session.active().and_then(|d| d.wb.active().map(|s| s.col_width(0))).unwrap_or(0.0);
+        let vorher = breite(&a);
+        a.run_or_alert("home.columnWidth", json!({"cols": "A", "chars": 30}));
+        assert!(breite(&a) > vorher);
+        a.run_or_alert("edit.undo", json!({}));
+        assert_eq!(breite(&a), vorher);
+        a.run_or_alert("home.rowHeight", json!({"rows": "1", "points": 40}));
+        let h = a.session.active().and_then(|d| d.wb.active().map(|s| s.row_height(0))).unwrap_or(0.0);
+        assert!((h - 40.0 / 0.75).abs() < 1.0, "{h}");
     }
 
     #[test]
