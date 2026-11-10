@@ -66,7 +66,7 @@ fn parse_top(src: &str, locale: crate::FormulaLocale, allow_union: bool) -> Resu
     }
     let toks = tokenize_locale(body, locale).map_err(|e| ParseError { msg: e.msg, pos: e.pos })?;
     let toks = significant_spaces(toks);
-    let mut p = Parser { toks, i: 0, depth: 0, input: locale == crate::FormulaLocale::Es };
+    let mut p = Parser { toks, i: 0, depth: 0, input: locale != crate::FormulaLocale::En };
     let e = p.expr(0, allow_union)?;
     match p.peek() {
         Tok::Eof => Ok(e),

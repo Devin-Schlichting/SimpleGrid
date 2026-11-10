@@ -186,7 +186,11 @@ impl Language {
     }
 
     pub fn formula_locale(self) -> simplegrid_engine::formula::FormulaLocale {
-        if self == Self::Es { simplegrid_engine::formula::FormulaLocale::Es } else { simplegrid_engine::formula::FormulaLocale::En }
+        match self {
+            Self::Es => simplegrid_engine::formula::FormulaLocale::Es,
+            Self::De => simplegrid_engine::formula::FormulaLocale::De,
+            _ => simplegrid_engine::formula::FormulaLocale::En,
+        }
     }
 
     /// Translates an interface label; untranslated labels fall back to English.

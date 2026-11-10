@@ -69,3 +69,15 @@
 - Rechtsklick-Menüs auf die Funktionen der Leiste reduziert (deutsch, größere Einträge, keine Untermenüs).
 - Tests: Euro, Umrandung mit Dicke/Farbe + Rückgängig, Verbinden-Warnung, alle Formate nach Speichern/Öffnen, Zoom.
   Entfernt: Tests des alten Rechtsklick-Menüs, der Seitenlayout-Lineale und der Formelobjekte.
+
+## Phase 6 – Formeln und Summe (2026-11-10)
+- Deutsche Formeleingabe über GridCraft's Sprachmechanismus (neu: `FormulaLocale::De`): `=SUMME(A1:A3;0,5)`,
+  `WAHR`/`FALSCH`. Gespeichert wird englisch (`SUM`, `,`, `.`), angezeigt deutsch. Funktionstabelle in
+  `crates/formula/src/input.rs` (`GERMAN`) – bisher nur SUMME; weitere nach Rücksprache.
+- Deutsche Fehlernamen in Zellen und Formeln (`#BEZUG!`, `#WERT!`, `#ZIRKEL!`, `#NV`, `#ZAHL!`), Eingabe auch deutsch.
+- Hinweisstreifen unter der Leiste erklärt den Fehler der markierten Zelle in Klartext („Durch Null geteilt …“).
+- „Σ Summe“: Bereich → Summe darunter (Zeile → rechts); einzelne Zahl in einer Zahlenspalte → zusammenhängender
+  Zahlenbereich, Summe in die nächste freie Zelle darunter; leere Zelle → GridCraft-AutoSumme.
+- Neuberechnung, Abhängigkeiten und Zirkelbezüge macht die GridCraft-Engine (Zirkel → `#ZIRKEL!`, keine Endlosschleife).
+- Tests: deutsche Formeln ↔ gespeicherte Schreibweise, Punkt-vor-Strich, Klammern, Fehlerketten, Zirkel,
+  Bezugsänderung durch Einfügen/Löschen, Summe in beiden Richtungen und von einer Zelle aus, SUM in der .xlsx.

@@ -426,7 +426,10 @@ pub fn format_value(v: &Value, fmt: &NumberFormat, sys: DateSystem) -> Formatted
             };
             Formatted { text: text.into(), ..Formatted::default() }
         }
-        Value::Error(e) => Formatted { text: e.as_str().into(), ..Formatted::default() },
+        Value::Error(e) => {
+            let text = if simplegrid_core::locale::german() { simplegrid_core::locale::error_name(*e) } else { e.as_str() };
+            Formatted { text: text.into(), ..Formatted::default() }
+        }
         Value::Array(a) => match a.data.first() {
             Some(Value::Array(_)) | None => Formatted::default(),
             Some(first) => format_value(first, fmt, sys),

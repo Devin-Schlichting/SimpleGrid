@@ -36,6 +36,42 @@ pub fn german() -> bool {
     LOCAL.try_with(Cell::get).ok().flatten().unwrap_or_else(|| GLOBAL.load(Ordering::Relaxed))
 }
 
+/// Der deutsche Name eines Fehlerwerts (`#BEZUG!` statt `#REF!`), wie ihn die Anzeige zeigt.
+pub fn error_name(e: crate::value::CellError) -> &'static str {
+    use crate::value::CellError as E;
+    match e {
+        E::Ref => "#BEZUG!",
+        E::Value => "#WERT!",
+        E::NA => "#NV",
+        E::Num => "#ZAHL!",
+        E::Circ => "#ZIRKEL!",
+        E::Spill => "#ÜBERLAUF!",
+        E::Calc => "#KALK!",
+        other => other.as_str(),
+    }
+}
+
+/// Liest einen deutschen Fehlernamen (`#BEZUG!`) zurück.
+pub fn parse_error_name(s: &str) -> Option<crate::value::CellError> {
+    let u = s.trim().to_uppercase();
+    crate::value::CellError::ALL.iter().chain([crate::value::CellError::Circ].iter()).find(|e| error_name(**e) == u).copied()
+}
+
+/// Was ein Fehlerwert bedeutet, in einfachen Worten.
+pub fn error_explanation(e: crate::value::CellError) -> &'static str {
+    use crate::value::CellError as E;
+    match e {
+        E::Div0 => "Durch Null geteilt: Die Formel teilt durch eine leere Zelle oder durch 0.",
+        E::Ref => "Bezug fehlt: Die Formel zeigt auf eine Zelle, die gelöscht wurde.",
+        E::Value => "Falscher Wert: Die Formel rechnet mit Text statt mit einer Zahl.",
+        E::Name => "Unbekannter Name: Die Formel enthält einen Namen oder eine Funktion, die es nicht gibt (Tippfehler?).",
+        E::Circ => "Zirkelbezug: Die Formel braucht ihr eigenes Ergebnis, direkt oder über andere Zellen.",
+        E::Num => "Ungültige Zahl: Das Ergebnis ist zu groß oder lässt sich nicht berechnen.",
+        E::NA => "Kein Wert: Ein gesuchter Wert wurde nicht gefunden.",
+        _ => "Die Formel lässt sich nicht berechnen.",
+    }
+}
+
 /// Tauscht in einer fertig formatierten Zahl Punkt und Komma, wo sie zwischen Ziffern stehen:
 /// `1,234.56` → `1.234,56`. Text wie „Stk.“ bleibt unverändert.
 pub fn localize_number_text(s: &str) -> String {

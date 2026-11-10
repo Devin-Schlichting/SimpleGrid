@@ -9,7 +9,12 @@ pub enum FormulaLocale {
     #[default]
     En,
     Es,
+    /// SimpleGrid: Deutsch (`SUMME`, `;` als Trenner, Dezimalkomma, `WAHR`/`FALSCH`).
+    De,
 }
+
+/// Deutsche Funktionsnamen. Erweiterbar: weitere Paare hier eintragen.
+const GERMAN: &[(&str, &str)] = &[("SUM", "SUMME"), ("TRUE", "WAHR"), ("FALSE", "FALSCH")];
 
 const SPANISH: &[(&str, &str)] = &[
     ("SUM", "SUMA"),
@@ -31,27 +36,37 @@ const SPANISH: &[(&str, &str)] = &[
 ];
 
 impl FormulaLocale {
-    pub fn list_separator(self) -> char {
-        if self == Self::Es { ';' } else { ',' }
+    /// Sprachen mit Dezimalkomma und Semikolon als Trenner.
+    fn comma(self) -> bool {
+        matches!(self, Self::Es | Self::De)
     }
-    pub fn decimal_separator(self) -> char {
-        if self == Self::Es { ',' } else { '.' }
-    }
-    pub fn array_column_separator(self) -> char {
-        if self == Self::Es { '\\' } else { ',' }
-    }
-    pub fn function_name(self, canonical: &str) -> &str {
-        if self == Self::Es {
-            SPANISH.iter().find(|(en, _)| en.eq_ignore_ascii_case(canonical)).map(|(_, es)| *es).unwrap_or(canonical)
-        } else {
-            canonical
+    fn table(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            Self::En => &[],
+            Self::Es => SPANISH,
+            Self::De => GERMAN,
         }
     }
+    pub fn list_separator(self) -> char {
+        if self.comma() { ';' } else { ',' }
+    }
+    pub fn decimal_separator(self) -> char {
+        if self.comma() { ',' } else { '.' }
+    }
+    pub fn array_column_separator(self) -> char {
+        if self.comma() { '\\' } else { ',' }
+    }
+    pub fn function_name(self, canonical: &str) -> &str {
+        self.table().iter().find(|(en, _)| en.eq_ignore_ascii_case(canonical)).map(|(_, l)| *l).unwrap_or(canonical)
+    }
     pub fn canonical_name(self, localized: &str) -> &str {
-        if self == Self::Es {
-            SPANISH.iter().find(|(_, es)| es.eq_ignore_ascii_case(localized)).map(|(en, _)| *en).unwrap_or(localized)
-        } else {
-            localized
+        self.table().iter().find(|(_, l)| l.eq_ignore_ascii_case(localized)).map(|(en, _)| *en).unwrap_or(localized)
+    }
+    /// Die Wahrheitswerte dieser Sprache.
+    fn booleans(self) -> (&'static str, &'static str) {
+        match self {
+            Self::De => ("WAHR", "FALSCH"),
+            _ => ("VERDADERO", "FALSO"),
         }
     }
 }
@@ -59,9 +74,17 @@ impl FormulaLocale {
 /// Parses UI input using the selected function table and separators. Existing names and
 /// LET/LAMBDA bindings take precedence over aliases. File and API syntax uses [`crate::parse`].
 pub fn parse_input(src: &str, locale: FormulaLocale, known_name: impl Fn(&str) -> bool) -> Result<Expr, ParseError> {
+    // SimpleGrid: deutsche Fehlernamen (#BEZUG!) vor dem Lesen in die Dateischreibweise bringen.
+    let german_errors;
+    let src = if locale == FormulaLocale::De && src.contains('#') {
+        german_errors = german_errors_to_canonical(src);
+        german_errors.as_str()
+    } else {
+        src
+    };
     let mut expr = parser::parse_syntax(src, locale)?;
-    if locale == FormulaLocale::Es {
-        normalize(&mut expr, &known_name, &mut Bindings::default(), 0, false)?;
+    if locale != FormulaLocale::En {
+        normalize(&mut expr, &known_name, &mut Bindings::default(), 0, false, locale)?;
     }
     Ok(expr)
 }
@@ -96,7 +119,7 @@ pub fn print_input(expr: &Expr, locale: FormulaLocale, known_name: impl Fn(&str)
         return Ok(crate::print(expr));
     }
     let mut expr = expr.clone();
-    normalize(&mut expr, &known_name, &mut Bindings::default(), 0, true)?;
+    normalize(&mut expr, &known_name, &mut Bindings::default(), 0, true, locale)?;
     let canonical = crate::print(&expr);
     let tokens = crate::lexer::tokenize(&canonical).map_err(|e| ParseError { msg: e.msg, pos: e.pos })?;
     let mut out = String::new();
@@ -114,6 +137,8 @@ pub fn print_input(expr: &Expr, locale: FormulaLocale, known_name: impl Fn(&str)
                 out.push_str(text);
             }
             Tok::Number(_) => out.push_str(&text.replace('.', &locale.decimal_separator().to_string())),
+            // SimpleGrid: Fehlerwerte in Formeln deutsch zeigen (#BEZUG! statt #REF!).
+            Tok::Error(e) if locale == FormulaLocale::De => out.push_str(simplegrid_core::locale::error_name(e)),
             Tok::Comma => out.push(if array_depth > 0 { locale.array_column_separator() } else { locale.list_separator() }),
             _ => out.push_str(text),
         }
@@ -121,10 +146,37 @@ pub fn print_input(expr: &Expr, locale: FormulaLocale, known_name: impl Fn(&str)
     Ok(out)
 }
 
+/// `#BEZUG!` → `#REF!` usw., außerhalb von Text in Anführungszeichen.
+fn german_errors_to_canonical(src: &str) -> String {
+    use simplegrid_core::value::CellError;
+    let mut out = String::with_capacity(src.len());
+    let mut in_text = false;
+    let mut rest = src;
+    while let Some(c) = rest.chars().next() {
+        if c == '"' {
+            in_text = !in_text;
+        }
+        if !in_text && c == '#' {
+            let found = CellError::ALL.iter().chain([CellError::Circ].iter()).find(|e| {
+                let name = simplegrid_core::locale::error_name(**e);
+                rest.get(..name.len()).is_some_and(|head| head.eq_ignore_ascii_case(name))
+            });
+            if let Some(e) = found {
+                out.push_str(e.as_str());
+                rest = &rest[simplegrid_core::locale::error_name(*e).len()..];
+                continue;
+            }
+        }
+        out.push(c);
+        rest = &rest[c.len_utf8()..];
+    }
+    out
+}
+
 pub(crate) fn boolean_alias(name: &str) -> Option<bool> {
-    if name.eq_ignore_ascii_case("VERDADERO") {
+    if name.eq_ignore_ascii_case("VERDADERO") || name.eq_ignore_ascii_case("WAHR") {
         Some(true)
-    } else if name.eq_ignore_ascii_case("FALSO") {
+    } else if name.eq_ignore_ascii_case("FALSO") || name.eq_ignore_ascii_case("FALSCH") {
         Some(false)
     } else {
         None
@@ -167,14 +219,22 @@ impl Bindings {
     }
 }
 
-fn normalize(expr: &mut Expr, known_name: &impl Fn(&str) -> bool, bindings: &mut Bindings, depth: usize, display: bool) -> Result<(), ParseError> {
+fn normalize(
+    expr: &mut Expr,
+    known_name: &impl Fn(&str) -> bool,
+    bindings: &mut Bindings,
+    depth: usize,
+    display: bool,
+    locale: FormulaLocale,
+) -> Result<(), ParseError> {
     if depth > parser::MAX_DEPTH {
         return Err(ParseError { msg: "formula is nested too deeply".into(), pos: 0 });
     }
     let bound = |name: &str, bindings: &Bindings| bindings.contains(name) || known_name(name);
     match expr {
         Expr::Bool(value) if display => {
-            let alias = if *value { "VERDADERO" } else { "FALSO" };
+            let (t, f) = locale.booleans();
+            let alias = if *value { t } else { f };
             if !bound(alias, bindings) {
                 *expr = Expr::Name(alias.into());
             }
@@ -190,13 +250,13 @@ fn normalize(expr: &mut Expr, known_name: &impl Fn(&str) -> bool, bindings: &mut
                 for pair in pairs.chunks_mut(2) {
                     if let [declaration, value] = pair {
                         // The new name is not in scope in its own value expression.
-                        normalize(value, known_name, bindings, depth + 1, display)?;
+                        normalize(value, known_name, bindings, depth + 1, display, locale)?;
                         if let Expr::Name(name) = declaration {
                             bindings.push(name);
                         }
                     }
                 }
-                normalize(body, known_name, bindings, depth + 1, display)?;
+                normalize(body, known_name, bindings, depth + 1, display, locale)?;
             }
             bindings.truncate(saved);
         }
@@ -208,40 +268,40 @@ fn normalize(expr: &mut Expr, known_name: &impl Fn(&str) -> bool, bindings: &mut
                         bindings.push(name);
                     }
                 }
-                normalize(body, known_name, bindings, depth + 1, display)?;
+                normalize(body, known_name, bindings, depth + 1, display, locale)?;
             }
             bindings.truncate(saved);
         }
         Expr::Call(name, args) => {
-            let alias = if display { FormulaLocale::Es.function_name(name) } else { FormulaLocale::Es.canonical_name(name) };
+            let alias = if display { locale.function_name(name) } else { locale.canonical_name(name) };
             if !bound(name, bindings) && (!display || !bound(alias, bindings)) {
                 *name = alias.to_string();
             }
             for arg in args {
-                normalize(arg, known_name, bindings, depth + 1, display)?;
+                normalize(arg, known_name, bindings, depth + 1, display, locale)?;
             }
         }
         Expr::Invoke(callee, args) => {
-            normalize(callee, known_name, bindings, depth + 1, display)?;
+            normalize(callee, known_name, bindings, depth + 1, display, locale)?;
             for arg in args {
-                normalize(arg, known_name, bindings, depth + 1, display)?;
+                normalize(arg, known_name, bindings, depth + 1, display, locale)?;
             }
         }
-        Expr::Unary(_, child) | Expr::Paren(child) => normalize(child, known_name, bindings, depth + 1, display)?,
+        Expr::Unary(_, child) | Expr::Paren(child) => normalize(child, known_name, bindings, depth + 1, display, locale)?,
         Expr::Binary(..) => {
             // Follow the left spine of a flat chain (A1+A2+…) in a loop: it is not nesting.
             // Each call leaves `bindings` as it found them, so the order does not matter.
             let mut node = expr;
             while let Expr::Binary(_, left, right) = node {
-                normalize(right, known_name, bindings, depth + 1, display)?;
+                normalize(right, known_name, bindings, depth + 1, display, locale)?;
                 node = left;
             }
-            normalize(node, known_name, bindings, depth, display)?;
+            normalize(node, known_name, bindings, depth, display, locale)?;
         }
         Expr::Array(rows) if display => {
             for row in rows {
                 for child in row {
-                    normalize(child, known_name, bindings, depth + 1, display)?;
+                    normalize(child, known_name, bindings, depth + 1, display, locale)?;
                 }
             }
         }

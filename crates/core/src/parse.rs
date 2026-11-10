@@ -33,6 +33,11 @@ pub fn parse_input(s: &str, sys: DateSystem) -> Parsed {
     if let Some(e) = CellError::parse(t) {
         return Parsed { value: Value::Error(e), format: None };
     }
+    if crate::locale::german()
+        && let Some(e) = crate::locale::parse_error_name(t)
+    {
+        return Parsed { value: Value::Error(e), format: None };
+    }
     // SimpleGrid: deutsche Schreibweise zuerst (12,5 – 1.234,56 – 12,50 € – 10.11.2026).
     if crate::locale::german() {
         if t.eq_ignore_ascii_case("WAHR") {

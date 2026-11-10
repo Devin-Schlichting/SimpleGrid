@@ -169,6 +169,7 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             gruppe(ui, "Datei", |ui| datei(app, ui));
             gruppe(ui, "Bearbeiten", |ui| bearbeiten(app, ui));
+            gruppe(ui, "Rechnen", |ui| rechnen(app, ui));
             gruppe(ui, "Zeilen und Spalten", |ui| zeilen_spalten(app, ui));
             gruppe(ui, "Schrift", |ui| schrift(app, ui));
             gruppe(ui, "Zellen", |ui| zellen(app, ui));
@@ -182,6 +183,7 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
         ui.ctx().data_mut(|d| d.insert_temp(hoehe_id, gemessen));
         ui.ctx().request_repaint();
     }
+    fehler_hinweis(app, ui);
 }
 
 fn datei(app: &mut SheetApp, ui: &mut Ui) {
@@ -493,6 +495,81 @@ fn ansicht(app: &mut SheetApp, ui: &mut Ui) {
         && let Some(z) = groesser
     {
         app.run_or_alert("view.zoom", json!({"percent": z}));
+    }
+}
+
+/// Die Klartext-Erklärung zum Fehlerwert der markierten Zelle, z. B. „Durch Null geteilt …“.
+pub fn fehler_erklaerung(app: &SheetApp) -> Option<String> {
+    let d = app.session.active()?;
+    let sh = d.wb.active()?;
+    let zelle = d.selection.active;
+    match sh.value(zelle) {
+        simplegrid_engine::core::Value::Error(e) => Some(format!(
+            "{} in Zelle {}: {}",
+            simplegrid_engine::core::locale::error_name(e),
+            zelle.a1(),
+            simplegrid_engine::core::locale::error_explanation(e)
+        )),
+        _ => None,
+    }
+}
+
+/// Ein gut sichtbarer Hinweisstreifen unter der Leiste, solange eine Fehlerzelle markiert ist.
+fn fehler_hinweis(app: &SheetApp, ui: &mut Ui) {
+    let Some(text) = fehler_erklaerung(app) else { return };
+    let t = Tokens::get(ui.ctx());
+    egui::Panel::top("simplegrid_fehler")
+        .resizable(false)
+        .frame(egui::Frame::NONE.fill(t.notice_warn_bg).stroke(egui::Stroke::new(1.0, t.notice_warn_border)).inner_margin(egui::Margin::symmetric(12, 8)))
+        .show(ui, |ui| {
+            ui.label(RichText::new(format!("⚠ {text}")).font(theme::ui_font(masse::SCHRIFT)).color(t.text));
+        });
+}
+
+fn rechnen(app: &mut SheetApp, ui: &mut Ui) {
+    let ohne = gesperrt(app, "formulas.autoSum").map(|_| texte::NICHT_MOEGLICH);
+    if knopf(ui, "Σ Summe", "Zahlen zusammenzählen: Bereich markieren und klicken – die Summe kommt darunter (bei einer Zeile rechts daneben)", ohne, false) {
+        summe(app);
+    }
+}
+
+/// „Summe“: Ist eine Zahl in einer Zahlenspalte markiert, wird der zusammenhängende Zahlenbereich
+/// erkannt und die Summe in die nächste freie Zelle darunter geschrieben. Sonst gilt GridCraft's
+/// AutoSumme (Bereich: Summen darunter bzw. rechts; leere Zelle: Zahlen darüber oder links).
+pub fn summe(app: &mut SheetApp) {
+    use simplegrid_engine::core::{CellRef, RangeRef, Value};
+    if !app.commit_edit(0, 0, false, false) {
+        return;
+    }
+    let ziel = app.session.active().and_then(|d| {
+        let r = d.selection.current();
+        if !r.is_single() {
+            return None;
+        }
+        let sh = d.wb.active()?;
+        let zahl = |row: u32| matches!(sh.value(CellRef::new(row, r.start.col)), Value::Number(_));
+        if !zahl(r.start.row) {
+            return None;
+        }
+        let mut oben = r.start.row;
+        while oben > 0 && zahl(oben - 1) {
+            oben -= 1;
+        }
+        let mut unten = r.start.row;
+        while unten + 1 < simplegrid_engine::core::MAX_ROWS && zahl(unten + 1) {
+            unten += 1;
+        }
+        let frei = unten + 1;
+        let bereich = RangeRef::new(CellRef::new(oben, r.start.col), CellRef::new(unten, r.start.col));
+        (frei < simplegrid_engine::core::MAX_ROWS && sh.value(CellRef::new(frei, r.start.col)) == Value::Empty)
+            .then(|| (CellRef::new(frei, r.start.col), bereich))
+    });
+    match ziel {
+        Some((zelle, bereich)) => {
+            app.run_or_alert("cell.set", json!({"cell": zelle.a1(), "input": format!("=SUM({})", bereich.a1())}));
+            app.run_or_alert("selection.set", json!({"cell": zelle.a1()}));
+        }
+        None => app.run_or_alert("formulas.autoSum", json!({})),
     }
 }
 
@@ -1125,6 +1202,123 @@ mod tests {
         let z = a.session.active().and_then(|d| d.wb.active().map(|s| s.zoom)).unwrap_or_default();
         assert_eq!(z, 50);
         assert!(ZOOMSTUFEN.contains(&50) && ZOOMSTUFEN.contains(&300));
+    }
+
+    #[test]
+    fn deutsche_formeln_werden_gespeichert_wie_excel_sie_kennt() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "1,5"}));
+        a.run_or_alert("cell.set", json!({"cell": "A2", "input": "2"}));
+        let deutsch = |a: &SheetApp, t: &str| {
+            let d = a.session.active().unwrap_or_else(|| unreachable!());
+            crate::formula_locale::canonical(t, simplegrid_engine::formula::FormulaLocale::De, &d.wb, 0, simplegrid_engine::core::CellRef::new(0, 2)).unwrap_or_default()
+        };
+        let f = deutsch(&a, "=SUMME(A1:A2;0,5)*2");
+        assert_eq!(f, "=SUM(A1:A2,0.5)*2");
+        a.run_or_alert("cell.set", json!({"cell": "C1", "input": f}));
+        assert_eq!(wert(&mut a, "C1"), json!(8.0));
+        let d = a.session.active().unwrap_or_else(|| unreachable!());
+        let shown = crate::formula_locale::display("=SUM(A1:A2,0.5)*2", simplegrid_engine::formula::FormulaLocale::De, &d.wb, 0);
+        assert_eq!(shown, "=SUMME(A1:A2;0,5)*2");
+        assert_eq!(deutsch(&a, "=#BEZUG!+1"), "=#REF!+1");
+    }
+
+    #[test]
+    fn punkt_vor_strich_klammern_und_fehler() {
+        let mut a = app();
+        for (zelle, eingabe, erwartet) in [
+            ("B1", "=2+3*4", json!(14.0)),
+            ("B2", "=(2+3)*4", json!(20.0)),
+            ("B3", "=10/4", json!(2.5)),
+            ("B4", "=-2^2", json!(4.0)),
+            ("B5", "=1/0", json!({"error": "#DIV/0!"})),
+            ("B6", "=B5+1", json!({"error": "#DIV/0!"})),
+            ("B7", "=GIBTSNICHT(1)", json!({"error": "#NAME?"})),
+            ("B8", "=\"a\"*2", json!({"error": "#VALUE!"})),
+        ] {
+            a.run_or_alert("cell.set", json!({"cell": zelle, "input": eingabe}));
+            let v = a.session.execute("cell.get", json!({"cell": zelle})).unwrap_or_default();
+            assert_eq!(v["value"], erwartet, "{zelle} {eingabe}");
+        }
+        let text = |a: &mut SheetApp, c: &str| a.session.execute("cell.get", json!({"cell": c})).map(|v| v["text"].clone()).unwrap_or(Json::Null);
+        assert_eq!(text(&mut a, "B8"), json!("#WERT!"));
+        a.run_or_alert("selection.set", json!({"cell": "B5"}));
+        let erkl = fehler_erklaerung(&a).unwrap_or_default();
+        assert!(erkl.contains("Durch Null geteilt"), "{erkl}");
+    }
+
+    #[test]
+    fn zirkelbezug_haengt_nicht() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "=B1+1"}));
+        a.run_or_alert("cell.set", json!({"cell": "B1", "input": "=A1+1"}));
+        let v = a.session.execute("cell.get", json!({"cell": "A1"})).unwrap_or_default();
+        assert_eq!(v["text"], json!("#ZIRKEL!"));
+        a.run_or_alert("selection.set", json!({"cell": "A1"}));
+        assert!(fehler_erklaerung(&a).is_some_and(|t| t.contains("Zirkelbezug")));
+    }
+
+    #[test]
+    fn neuberechnung_und_bezugsaenderung() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "5"}));
+        a.run_or_alert("cell.set", json!({"cell": "A2", "input": "=A1*2"}));
+        a.run_or_alert("cell.set", json!({"cell": "A3", "input": "=A2+$A$1"}));
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "10"}));
+        assert_eq!(wert(&mut a, "A3"), json!(30.0));
+        a.run_or_alert("selection.set", json!({"range": "A1"}));
+        a.run_or_alert("home.insertRows", json!({}));
+        assert_eq!(formel(&mut a, "A4"), json!("=A3+$A$2"));
+        a.run_or_alert("selection.set", json!({"range": "A3"}));
+        a.run_or_alert("home.deleteRows", json!({}));
+        assert_eq!(wert(&mut a, "A3"), json!({"error": "#REF!"}));
+        let text = a.session.execute("cell.get", json!({"cell": "A3"})).map(|v| v["text"].clone()).unwrap_or(Json::Null);
+        assert_eq!(text, json!("#BEZUG!"));
+    }
+
+    #[test]
+    fn summe_unter_markiertem_bereich_und_rechts_bei_zeile() {
+        let mut a = app();
+        for (c, v) in [("A1", "1"), ("A2", "2"), ("A3", "3"), ("C1", "4"), ("D1", "5")] {
+            a.run_or_alert("cell.set", json!({"cell": c, "input": v}));
+        }
+        a.run_or_alert("selection.set", json!({"range": "A1:A3"}));
+        summe(&mut a);
+        assert_eq!(formel(&mut a, "A4"), json!("=SUM(A1:A3)"));
+        assert_eq!(wert(&mut a, "A4"), json!(6.0));
+        a.run_or_alert("selection.set", json!({"range": "C1:D1"}));
+        summe(&mut a);
+        assert_eq!(wert(&mut a, "E1"), json!(9.0));
+    }
+
+    #[test]
+    fn summe_erkennt_zahlenspalte_von_einer_zelle_aus() {
+        let mut a = app();
+        for (c, v) in [("B1", "Ausgaben"), ("B2", "10"), ("B3", "20,5"), ("B4", "30")] {
+            a.run_or_alert("cell.set", json!({"cell": c, "input": v}));
+        }
+        a.run_or_alert("selection.set", json!({"cell": "B3"}));
+        summe(&mut a);
+        assert_eq!(formel(&mut a, "B5"), json!("=SUM(B2:B4)"));
+        assert_eq!(wert(&mut a, "B5"), json!(60.5));
+        a.run_or_alert("cell.set", json!({"cell": "D1", "input": "1"}));
+        a.run_or_alert("cell.set", json!({"cell": "D2", "input": "2"}));
+        a.run_or_alert("selection.set", json!({"cell": "D3"}));
+        summe(&mut a);
+        assert_eq!(wert(&mut a, "D3"), json!(3.0));
+    }
+
+    #[test]
+    fn summe_wird_in_xlsx_englisch_gespeichert() {
+        let pfad = temp("summe.xlsx");
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "1"}));
+        a.run_or_alert("cell.set", json!({"cell": "A2", "input": "=SUM(A1)"}));
+        a.run_or_alert("file.save", json!({"path": pfad}));
+        let bytes = std::fs::read(&pfad).unwrap_or_default();
+        let (wb, _) = simplegrid_xlsx::read_xlsx(&bytes).unwrap_or_else(|_| unreachable!());
+        let f = wb.sheets[0].cell(simplegrid_engine::core::CellRef::new(1, 0)).and_then(|c| c.formula.clone()).map(|f| f.text.clone());
+        assert_eq!(f.as_deref(), Some("SUM(A1)"));
     }
 
     #[test]
