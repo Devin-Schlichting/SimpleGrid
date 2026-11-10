@@ -1,0 +1,14 @@
+[package]
+name = "simplegrid-formula"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SimpleGrid formula language: lexer, parser, printer and reference adjustment"
+
+[lints]
+workspace = true
+
+[dependencies]
+simplegrid-core = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }

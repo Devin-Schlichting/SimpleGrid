@@ -1,0 +1,12 @@
+[package]
+name = "simplegrid-pdf"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SimpleGrid's tiny self-contained PDF 1.7 writer (standard 14 fonts, vector drawing, RGBA images)"
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]

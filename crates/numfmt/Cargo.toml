@@ -1,0 +1,12 @@
+[package]
+name = "simplegrid-numfmt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SimpleGrid number formats: Excel format codes, General display, TEXT()"
+
+[lints]
+workspace = true
+
+[dependencies]
+simplegrid-core = { workspace = true }

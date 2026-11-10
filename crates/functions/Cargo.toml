@@ -1,0 +1,13 @@
+[package]
+name = "simplegrid-functions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SimpleGrid worksheet function library: math, statistics, text, dates, lookup, financial, engineering"
+
+[lints]
+workspace = true
+
+[dependencies]
+simplegrid-core = { workspace = true }
+regex = { workspace = true }

@@ -1,0 +1,17 @@
+[package]
+name = "simplegrid-calc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SimpleGrid calculation engine: dependency graph, recalculation, evaluator, dynamic arrays"
+
+[lints]
+workspace = true
+
+[dependencies]
+simplegrid-core = { workspace = true }
+simplegrid-formula = { workspace = true }
+simplegrid-functions = { workspace = true }
+simplegrid-numfmt = { workspace = true }
+simplegrid-model = { workspace = true }
+log = { workspace = true }

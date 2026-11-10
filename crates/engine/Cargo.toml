@@ -1,0 +1,31 @@
+[package]
+name = "simplegrid-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SimpleGrid engine: sessions, commands, history, clipboard, fill, sort, filter"
+
+[lints]
+workspace = true
+
+[dependencies]
+simplegrid-core = { workspace = true }
+simplegrid-numfmt = { workspace = true }
+simplegrid-formula = { workspace = true }
+simplegrid-functions = { workspace = true }
+simplegrid-model = { workspace = true }
+simplegrid-calc = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+web-time = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+simplegrid-xlsx = { workspace = true }
+simplegrid-chart = { workspace = true }
+simplegrid-pdf = { workspace = true }
+simplegrid-math = { workspace = true }
+image = { workspace = true }
+
+[dev-dependencies]
+simplegrid-xlsx = { workspace = true, features = ["test-support"] }
+zip = { workspace = true }
