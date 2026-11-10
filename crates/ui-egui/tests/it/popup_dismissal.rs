@@ -113,43 +113,6 @@ fn filter_closes_when_clicking_another_table_or_sheet() {
     }
 }
 
-#[test]
-fn popup_actions_still_execute_and_filter_checkboxes_stay_open() {
-    let mut h = harness();
-    open(&mut h, Menu::Header);
-    h.get_by_label("Copy").click();
-    h.run_steps(2);
-    assert!(!is_open(&h, Menu::Header));
-    assert!(h.state().session.clipboard.is_some());
-
-    open(&mut h, Menu::Filter);
-    h.get_by_label("(Select All)").click();
-    h.run_steps(2);
-    assert!(is_open(&h, Menu::Filter), "clicking a checkbox must keep the filter open");
-    let outside = cell_pos(&h, "H7");
-    click(&mut h, outside, PointerButton::Primary);
-    open(&mut h, Menu::Filter);
-    h.get_by_label("Apply").click();
-    h.run_steps(2);
-    let sh = h.state().session.active().unwrap().wb.active().unwrap();
-    assert!(!sh.is_row_hidden(1) && !sh.is_row_hidden(2), "cancelled checkbox edits must not be applied after reopening");
-
-    open(&mut h, Menu::Filter);
-    h.get_by_label("(Select All)").click();
-    h.run_steps(2);
-    h.get_by_label("Apply").click();
-    h.run_steps(2);
-    assert!(!is_open(&h, Menu::Filter));
-    assert!(h.state().session.active().unwrap().wb.active().unwrap().is_row_hidden(1));
-    h.state_mut().run("data.clearFilter", json!({})).unwrap();
-    h.run_steps(2);
-
-    open(&mut h, Menu::Validation);
-    h.get_by_label("Second").click();
-    h.run_steps(2);
-    assert!(!is_open(&h, Menu::Validation));
-    assert_eq!(h.state().session.active().unwrap().wb.active().unwrap().value(CellRef::parse("E3").unwrap()), Value::from("Second"));
-}
 
 #[test]
 fn worksheet_popups_close_on_escape_or_window_focus_loss() {

@@ -124,6 +124,8 @@ pub(super) fn display_text(
     {
         let max_chars = ((width_px - 4.0) / char_w).floor().max(1.0) as usize;
         return match simplegrid_engine::numfmt::format_general_fit(*n, max_chars.min(11)) {
+            // SimpleGrid: deutsche Schreibweise (12,5).
+            Some(t) if simplegrid_engine::core::locale::german() => (simplegrid_engine::core::locale::localize_number_text(&t), None, true, None),
             Some(t) => (t, None, true, None),
             None => ("#".repeat(max_chars.max(1)), None, true, None),
         };

@@ -67,7 +67,18 @@ pub enum Frage {
 #[derive(Clone, Debug, Default)]
 pub struct Zustand {
     pub frage: Option<Frage>,
+    /// Gewählte Dicke der Umrandung (`thin`, `medium`, `thick`); leer heißt dünn.
+    pub rahmen_dicke: String,
+    /// Gewählte Farbe der Umrandung (`#RRGGBB`); leer heißt schwarz.
+    pub rahmen_farbe: String,
 }
+
+/// Schriftgrößen zur Auswahl (feste Stufen).
+pub const SCHRIFTGROESSEN: [f32; 10] = [10.0, 11.0, 12.0, 14.0, 16.0, 18.0, 20.0, 24.0, 28.0, 36.0];
+/// Zoomstufen für „Größer“ und „Kleiner“ (Prozent).
+pub const ZOOMSTUFEN: [u32; 9] = [50, 75, 100, 125, 150, 175, 200, 250, 300];
+/// Dicken der Umrandung: (Engine-Name, Anzeige).
+pub const RAHMEN_DICKEN: [(&str, &str); 3] = [("thin", "Dünn"), ("medium", "Mittel"), ("thick", "Dick")];
 
 /// Deutsche Texte für übernommene GridCraft-Dialoge, die die allgemeine Übersetzung nicht kennt
 /// oder anders (einfacher) heißen sollen. Wird vor `i18n::de` gefragt.
@@ -83,6 +94,9 @@ pub fn uebersetzung(text: &str) -> Option<&'static str> {
         "Don't Save" => "Nicht speichern",
         "Close" => "Schließen",
         "Ready" => "Bereit",
+        "Theme Colors" => "Farben",
+        "Standard Colors" => "Kräftige Farben",
+        "Recent Colors" => "Zuletzt benutzt",
         _ => return None,
     })
 }
@@ -156,6 +170,10 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
             gruppe(ui, "Datei", |ui| datei(app, ui));
             gruppe(ui, "Bearbeiten", |ui| bearbeiten(app, ui));
             gruppe(ui, "Zeilen und Spalten", |ui| zeilen_spalten(app, ui));
+            gruppe(ui, "Schrift", |ui| schrift(app, ui));
+            gruppe(ui, "Zellen", |ui| zellen(app, ui));
+            gruppe(ui, "Umrandung", |ui| umrandung(app, ui));
+            gruppe(ui, "Ansicht", |ui| ansicht(app, ui));
             gruppe(ui, "Tabellenblatt", |ui| blaetter(app, ui));
         }).response);
         gemessen = r.content_size.y + 16.0;
@@ -291,6 +309,193 @@ fn bearbeiten(app: &mut SheetApp, ui: &mut Ui) {
     befehl(app, ui, "Inhalt löschen", "Den Inhalt der markierten Zellen löschen (auch Entf)", "edit.clearContents", json!({}));
 }
 
+/// Das Format der aktiven Zelle (für eingedrückte Schaltflächen wie „Fett“).
+fn aktiver_stil(app: &SheetApp) -> simplegrid_engine::model::Style {
+    app.session
+        .active()
+        .and_then(|d| {
+            let sh = d.wb.active()?;
+            Some(d.wb.styles.get(sh.style_id(d.selection.active)).clone())
+        })
+        .unwrap_or_default()
+}
+
+/// Eine Schaltfläche mit Farbfeld, die beim Klick die Farbauswahl (eine Ebene, keine Untermenüs)
+/// öffnet. Gibt die gewählte Farbe (`#RRGGBB` oder `none`) zurück.
+fn farbknopf(app: &SheetApp, ui: &mut Ui, text: &str, tipp: &str, ohne_farbe: &str, aus: Option<&str>) -> Option<String> {
+    let id = ui.scope_id().with(("simplegrid_farbe", text));
+    let r = ui.add_enabled(
+        aus.is_none(),
+        egui::Button::new(RichText::new(format!("{text} ▾")).font(theme::ui_font(masse::SCHRIFT))).min_size(vec2(masse::KNOPF_BREITE, masse::KNOPF_HOEHE)),
+    );
+    let r = match aus {
+        Some(grund) => r.on_disabled_hover_text(format!("{tipp}\n\n{grund}")),
+        None => r.on_hover_text(tipp),
+    };
+    let farben = app.session.active().map(|d| d.wb.theme.colors).unwrap_or(simplegrid_engine::model::Theme::default().colors);
+    let mut gewaehlt = None;
+    egui::Popup::menu(&r)
+        .id(id)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+        .open_memory(r.clicked().then_some(egui::SetOpenCommand::Toggle))
+        .show(|ui| {
+            if let Some(c) = crate::widgets::color_palette_fixed(ui, &farben, ohne_farbe) {
+                gewaehlt = Some(c);
+                ui.close();
+            }
+        });
+    gewaehlt
+}
+
+fn schrift(app: &mut SheetApp, ui: &mut Ui) {
+    let st = aktiver_stil(app);
+    let ohne = gesperrt(app, "home.bold").map(|_| texte::NICHT_MOEGLICH);
+    if knopf(ui, "Fett", "Die markierten Zellen fett schreiben (noch einmal klicken: wieder normal)", ohne, st.font.bold) {
+        app.run_or_alert("home.bold", json!({}));
+    }
+    if knopf(ui, "Kursiv", "Die markierten Zellen schräg schreiben (noch einmal klicken: wieder normal)", ohne, st.font.italic) {
+        app.run_or_alert("home.italic", json!({}));
+    }
+    let unterstrichen = st.font.underline != simplegrid_engine::model::Underline::None;
+    if knopf(ui, "Unterstrichen", "Die markierten Zellen unterstreichen (noch einmal klicken: wieder normal)", ohne, unterstrichen) {
+        app.run_or_alert("home.underline", json!({}));
+    }
+    // Schriftgröße: ein Auswahlfeld mit festen Stufen.
+    let mut groesse = st.font.size;
+    egui::ComboBox::from_id_salt("simplegrid_schriftgroesse")
+        .selected_text(RichText::new(format!("Größe {}", simplegrid_engine::core::locale::localize_number_text(&format!("{groesse}")))).font(theme::ui_font(masse::SCHRIFT)))
+        .width(masse::KNOPF_BREITE + 30.0)
+        .height(400.0)
+        .show_ui(ui, |ui| {
+            for g in SCHRIFTGROESSEN {
+                if ui.selectable_value(&mut groesse, g, RichText::new(format!("{g}")).font(theme::ui_font(masse::SCHRIFT))).clicked() {
+                    app.run_or_alert("home.fontSize", json!({"size": g}));
+                }
+            }
+        })
+        .response
+        .on_hover_text("Die Schriftgröße der markierten Zellen wählen");
+    if let Some(c) = farbknopf(app, ui, "Textfarbe", "Die Schriftfarbe der markierten Zellen wählen", "Automatisch", ohne) {
+        app.run_or_alert("home.fontColor", json!({"color": if c == "none" { "auto".to_string() } else { c }}));
+    }
+}
+
+fn zellen(app: &mut SheetApp, ui: &mut Ui) {
+    use simplegrid_engine::model::HAlign;
+    let st = aktiver_stil(app);
+    let ohne = gesperrt(app, "home.fillColor").map(|_| texte::NICHT_MOEGLICH);
+    if let Some(c) = farbknopf(app, ui, "Hintergrund", "Die Hintergrundfarbe der markierten Zellen wählen", "Keine Farbe", ohne) {
+        app.run_or_alert("home.fillColor", json!({"color": c}));
+    }
+    for (text, tipp, h, id) in [
+        ("Links", "Den Inhalt links ausrichten", HAlign::Left, "home.alignLeft"),
+        ("Mitte", "Den Inhalt in die Mitte setzen", HAlign::Center, "home.alignCenter"),
+        ("Rechts", "Den Inhalt rechts ausrichten", HAlign::Right, "home.alignRight"),
+    ] {
+        if knopf(ui, text, tipp, ohne, st.align.h == h) {
+            app.run_or_alert(id, json!({}));
+        }
+    }
+    let euro = st.num_fmt.as_str() == simplegrid_engine::core::locale::EURO_FORMAT;
+    if knopf(ui, "Euro €", "Zahlen als Geldbetrag zeigen, z. B. 1.234,56 € (noch einmal klicken: normale Zahl)", ohne, euro) {
+        euro_umschalten(app, euro);
+    }
+    if knopf(ui, "Zellen verbinden", "Die markierten Zellen zu einer großen Zelle verbinden", ohne, false) {
+        verbinden(app);
+    }
+    let in_verbund = app.session.active().and_then(|d| d.wb.active().map(|sh| (sh.merges.clone(), d.selection.current()))).is_some_and(|(m, r)| m.iter().any(|x| x.intersects(&r)));
+    let trennen_aus = if in_verbund { ohne } else { Some("Hier sind keine verbundenen Zellen markiert.") };
+    if knopf(ui, "Verbindung trennen", "Verbundene Zellen wieder in einzelne Zellen teilen", trennen_aus, false) {
+        app.run_or_alert("home.unmergeCells", json!({}));
+    }
+}
+
+/// „Euro“: an → Euro-Format; noch einmal → normale Zahl.
+pub fn euro_umschalten(app: &mut SheetApp, ist_euro: bool) {
+    let code = if ist_euro { "General" } else { simplegrid_engine::core::locale::EURO_FORMAT };
+    app.run_or_alert("home.numberFormat", json!({"code": code}));
+}
+
+/// „Zellen verbinden“: gehen dabei Inhalte verloren (nur die obere linke Zelle bleibt), erst fragen.
+pub fn verbinden(app: &mut SheetApp) {
+    if !app.commit_edit(0, 0, false, false) {
+        return;
+    }
+    let verlust = app.session.active().and_then(|d| {
+        let r = d.selection.current();
+        let sh = d.wb.active()?;
+        Some(sh.cells.iter_range(r).any(|(c, cell)| c != r.start && !cell.is_blank()))
+    });
+    if verlust == Some(true) {
+        app.einfach.frage = Some(Frage::Bestaetigen {
+            titel: "Zellen verbinden?".into(),
+            text: "Beim Verbinden bleibt nur der Inhalt der Zelle oben links erhalten. Die anderen Inhalte gehen verloren. Mit „Rückgängig“ können Sie es zurückholen.".into(),
+            knopf: "Verbinden".into(),
+            befehl: "home.mergeCells".into(),
+            params: json!({}),
+        });
+    } else {
+        app.run_or_alert("home.mergeCells", json!({}));
+    }
+}
+
+fn umrandung(app: &mut SheetApp, ui: &mut Ui) {
+    let ohne = gesperrt(app, "home.borders").map(|_| texte::NICHT_MOEGLICH);
+    let dicke = if app.einfach.rahmen_dicke.is_empty() { "thin".to_string() } else { app.einfach.rahmen_dicke.clone() };
+    let anzeige = RAHMEN_DICKEN.iter().find(|(k, _)| *k == dicke).map_or("Dünn", |(_, a)| *a);
+    egui::ComboBox::from_id_salt("simplegrid_rahmendicke")
+        .selected_text(RichText::new(format!("Linie: {anzeige}")).font(theme::ui_font(masse::SCHRIFT)))
+        .width(masse::KNOPF_BREITE + 40.0)
+        .show_ui(ui, |ui| {
+            for (k, a) in RAHMEN_DICKEN {
+                if ui.selectable_label(dicke == k, RichText::new(a).font(theme::ui_font(masse::SCHRIFT))).clicked() {
+                    app.einfach.rahmen_dicke = k.to_string();
+                }
+            }
+        })
+        .response
+        .on_hover_text("Wie dick die Linien werden");
+    if let Some(c) = farbknopf(app, ui, "Linienfarbe", "Die Farbe der Linien wählen", "Schwarz", ohne) {
+        app.einfach.rahmen_farbe = if c == "none" { String::new() } else { c };
+    }
+    for (text, tipp, preset) in [
+        ("Außen", "Einen Rahmen um die markierten Zellen ziehen", "outside"),
+        ("Innen", "Linien zwischen den markierten Zellen ziehen", "inside"),
+        ("Alle", "Alle Linien der markierten Zellen ziehen", "all"),
+        ("Keine", "Alle Linien der markierten Zellen entfernen", "none"),
+    ] {
+        if knopf(ui, text, tipp, ohne, false) {
+            umranden(app, preset);
+        }
+    }
+}
+
+/// Zieht die Umrandung `preset` mit der gewählten Dicke und Farbe.
+pub fn umranden(app: &mut SheetApp, preset: &str) {
+    let dicke = if app.einfach.rahmen_dicke.is_empty() { "thin" } else { app.einfach.rahmen_dicke.as_str() };
+    let farbe = if app.einfach.rahmen_farbe.is_empty() { "#000000" } else { app.einfach.rahmen_farbe.as_str() };
+    let params = json!({"preset": preset, "style": dicke, "color": farbe});
+    app.run_or_alert("home.borders", params);
+}
+
+fn ansicht(app: &mut SheetApp, ui: &mut Ui) {
+    let zoom = app.session.active().and_then(|d| d.wb.active().map(|s| u32::from(s.zoom))).unwrap_or(100);
+    let ohne = gesperrt(app, "view.zoom").map(|_| texte::NICHT_MOEGLICH);
+    let kleiner = ZOOMSTUFEN.iter().rev().find(|z| **z < zoom).copied();
+    let groesser = ZOOMSTUFEN.iter().find(|z| **z > zoom).copied();
+    if knopf(ui, "− Kleiner", "Die Tabelle kleiner anzeigen (ändert nicht den Druck)", if kleiner.is_none() { Some("Kleiner geht es nicht.") } else { ohne }, false)
+        && let Some(z) = kleiner
+    {
+        app.run_or_alert("view.zoom", json!({"percent": z}));
+    }
+    ui.label(RichText::new(format!("{zoom} %")).font(theme::ui_bold(masse::SCHRIFT)));
+    if knopf(ui, "+ Größer", "Die Tabelle größer anzeigen (ändert nicht den Druck)", if groesser.is_none() { Some("Größer geht es nicht.") } else { ohne }, false)
+        && let Some(z) = groesser
+    {
+        app.run_or_alert("view.zoom", json!({"percent": z}));
+    }
+}
+
 fn zeilen_spalten(app: &mut SheetApp, ui: &mut Ui) {
     let ohne = gesperrt(app, "home.insertRows").map(|_| texte::NICHT_MOEGLICH);
     let (zeilen, spalten) = auswahl_zeilen_spalten(app);
@@ -327,7 +532,7 @@ fn auswahl_zeilen_spalten(app: &SheetApp) -> ((u32, u32), (u32, u32)) {
 }
 
 /// „Zeile entfernen“ / „Spalte entfernen“: stehen Daten darin, erst fragen.
-fn entfernen(app: &mut SheetApp, zeilen: bool) {
+pub(crate) fn entfernen(app: &mut SheetApp, zeilen: bool) {
     if !app.commit_edit(0, 0, false, false) {
         return;
     }
@@ -826,6 +1031,100 @@ mod tests {
         a.run_or_alert("home.rowHeight", json!({"rows": "1", "points": 40}));
         let h = a.session.active().and_then(|d| d.wb.active().map(|s| s.row_height(0))).unwrap_or(0.0);
         assert!((h - 40.0 / 0.75).abs() < 1.0, "{h}");
+    }
+
+    #[test]
+    fn euro_anzeige_und_umschalten() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "1234,56"}));
+        a.run_or_alert("selection.set", json!({"range": "A1"}));
+        euro_umschalten(&mut a, false);
+        let text = |a: &mut SheetApp| a.session.execute("cell.get", json!({"cell": "A1"})).map(|v| v["text"].clone()).unwrap_or(Json::Null);
+        assert_eq!(text(&mut a), json!("1.234,56 €"));
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "12,5"}));
+        assert_eq!(text(&mut a), json!("12,50 €"), "Eingabe 12,5 erscheint als 12,50 €");
+        assert_eq!(wert(&mut a, "A1"), json!(12.5), "intern bleibt es eine Zahl");
+        euro_umschalten(&mut a, true);
+        assert_eq!(text(&mut a), json!("12,5"));
+    }
+
+    #[test]
+    fn umrandung_mit_dicke_und_farbe() {
+        let mut a = app();
+        a.run_or_alert("selection.set", json!({"range": "B2:C3"}));
+        a.einfach.rahmen_dicke = "thick".into();
+        a.einfach.rahmen_farbe = "#FF0000".into();
+        umranden(&mut a, "outside");
+        let st = a.session.execute("cell.get", json!({"cell": "B2"})).unwrap_or_default();
+        assert_eq!(st["style"]["borders"]["top"]["style"], json!("Thick"), "{st}");
+        assert_eq!(st["style"]["borders"]["left"]["style"], json!("Thick"));
+        assert_eq!(st["style"]["borders"]["right"]["style"], json!("None"), "innen keine Linie");
+        a.run_or_alert("edit.undo", json!({}));
+        let st = a.session.execute("cell.get", json!({"cell": "B2"})).unwrap_or_default();
+        assert_eq!(st["style"]["borders"]["top"]["style"], json!("None"));
+    }
+
+    #[test]
+    fn verbinden_warnt_bei_datenverlust() {
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "oben"}));
+        a.run_or_alert("selection.set", json!({"range": "A1:B1"}));
+        verbinden(&mut a);
+        assert!(a.einfach.frage.is_none(), "B1 ist leer: ohne Rückfrage");
+        a.run_or_alert("home.unmergeCells", json!({}));
+        a.run_or_alert("cell.set", json!({"cell": "B2", "input": "geht verloren"}));
+        a.run_or_alert("selection.set", json!({"range": "A2:B2"}));
+        verbinden(&mut a);
+        assert!(matches!(&a.einfach.frage, Some(Frage::Bestaetigen { befehl, .. }) if befehl == "home.mergeCells"));
+        assert_eq!(wert(&mut a, "B2"), json!("geht verloren"));
+    }
+
+    #[test]
+    fn formate_ueberstehen_speichern_und_oeffnen() {
+        let pfad = temp("formate.xlsx");
+        let mut a = app();
+        a.run_or_alert("cell.set", json!({"cell": "A1", "input": "99,9"}));
+        a.run_or_alert("selection.set", json!({"range": "A1:B2"}));
+        for (id, p) in [
+            ("home.bold", json!({})),
+            ("home.italic", json!({})),
+            ("home.underline", json!({})),
+            ("home.fontSize", json!({"size": 16})),
+            ("home.fontColor", json!({"color": "#0000FF"})),
+            ("home.fillColor", json!({"color": "#FFFF00"})),
+            ("home.alignCenter", json!({})),
+        ] {
+            a.run_or_alert(id, p);
+        }
+        euro_umschalten(&mut a, false);
+        a.einfach.rahmen_dicke = "medium".into();
+        umranden(&mut a, "all");
+        a.run_or_alert("home.mergeCells", json!({"range": "C1:D1"}));
+        a.run_or_alert("file.save", json!({"path": pfad}));
+        let mut b = app();
+        oeffnen_pfad(&mut b, &pfad);
+        let st = b.session.execute("cell.get", json!({"cell": "A1"})).unwrap_or_default();
+        let s = &st["style"];
+        assert_eq!(s["font"]["bold"], json!(true));
+        assert_eq!(s["font"]["italic"], json!(true));
+        assert_eq!(s["font"]["underline"], json!("Single"));
+        assert_eq!(s["font"]["size"], json!(16.0));
+        assert_eq!(s["align"]["h"], json!("Center"));
+        assert_eq!(s["borders"]["bottom"]["style"], json!("Medium"));
+        assert_eq!(s["num_fmt"], json!(simplegrid_engine::core::locale::EURO_FORMAT));
+        assert_eq!(st["text"], json!("99,90 €"));
+        let merges = b.session.active().and_then(|d| d.wb.active().map(|s| s.merges.iter().map(|m| m.a1()).collect::<Vec<_>>())).unwrap_or_default();
+        assert_eq!(merges, ["C1:D1"]);
+    }
+
+    #[test]
+    fn zoom_stufen() {
+        let mut a = app();
+        a.run_or_alert("view.zoom", json!({"percent": 300}));
+        a.run_or_alert("view.zoom", json!({"percent": 50}));
+        let z = a.session.active().and_then(|d| d.wb.active().map(|s| s.zoom)).unwrap_or_default();
+        assert_eq!(z, 50);
+        assert!(ZOOMSTUFEN.contains(&50) && ZOOMSTUFEN.contains(&300));
     }
 
     #[test]

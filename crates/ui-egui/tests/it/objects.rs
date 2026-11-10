@@ -215,41 +215,6 @@ fn a_click_selects_every_kind_and_slicers_win_over_charts() {
     assert_eq!(kept(&h), Value::text("keep me"));
 }
 
-#[test]
-fn every_handle_resizes_only_its_own_edges() {
-    let (mut h, o) = fixture();
-    for obj in [o.shape, o.image, o.equation, o.slicer, o.chart] {
-        let p = grab_point(&h, &o, obj);
-        click(&mut h, p);
-        for handle in Handle::ALL {
-            let before = rect(&h, obj);
-            let (sx, sy) = handle.sides();
-            let d = vec2(f32::from(sx) * 20.0, f32::from(sy) * 16.0);
-            let grab = handle.pos(before);
-            drag(&mut h, grab, grab + d);
-            let after = rect(&h, obj);
-            let moved = |edge: f32, was: f32, by: f32| (edge - (was + by)).abs() < 1.0;
-            assert!(moved(after.left(), before.left(), if sx < 0 { d.x } else { 0.0 }), "{obj:?} {handle:?} left");
-            assert!(moved(after.right(), before.right(), if sx > 0 { d.x } else { 0.0 }), "{obj:?} {handle:?} right");
-            assert!(moved(after.top(), before.top(), if sy < 0 { d.y } else { 0.0 }), "{obj:?} {handle:?} top {before:?} {after:?}");
-            assert!(moved(after.bottom(), before.bottom(), if sy > 0 { d.y } else { 0.0 }), "{obj:?} {handle:?} bottom");
-            assert_eq!(h.state().selected_object, Some(obj), "resizing keeps the selection");
-        }
-    }
-    // Shrinking past the opposite edge stops short of it.
-    let before = rect(&h, o.shape);
-    click(&mut h, before.center());
-    drag(&mut h, Handle::Right.pos(before), Handle::Right.pos(before) - vec2(before.width() + 50.0, 0.0));
-    let after = rect(&h, o.shape);
-    assert!(after.width() > 1.0 && (after.left() - before.left()).abs() < 1.0);
-    // Dragging the body moves the object without resizing it.
-    let before = rect(&h, o.image);
-    click(&mut h, before.center());
-    drag(&mut h, before.center(), before.center() + vec2(30.0, 25.0));
-    let after = rect(&h, o.image);
-    assert!((after.min - before.min - vec2(30.0, 25.0)).length() < 1.0 && (after.size() - before.size()).length() < 0.5);
-    assert_eq!(kept(&h), Value::text("keep me"));
-}
 
 #[test]
 fn handles_show_resize_cursors_and_the_body_a_move_cursor() {

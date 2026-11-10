@@ -93,6 +93,7 @@ fn main() {
     let _ = simplegrid_ui_egui::fonts::catalog();
     let mut session = Session::new();
     simplegrid_ui_egui::einfach::deutsche_vorgaben(&mut session);
+    simplegrid_engine::core::locale::set_german(true);
     if let Some(p) = &input {
         session.execute("file.open", json!({"path": p})).expect("open");
     } else if let Some(s) = &sample {

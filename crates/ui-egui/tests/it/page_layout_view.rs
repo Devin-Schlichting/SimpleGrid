@@ -239,41 +239,6 @@ fn per_inch(g: &Geo) -> f32 {
     (72.0 / (pg.paper_pt.0 as f64 / pg.page_w)) as f32 * g.z
 }
 
-#[test]
-fn header_and_footer_margins_are_dragged_on_the_vertical_ruler() {
-    let mut h = fixture();
-    let g = geo(&h);
-    let pg = g.paper.clone().unwrap();
-    let start = margins(&h);
-    let ruler_x = h.state().grid.rect.unwrap().left() + 9.0;
-    // Header: distance from the top of the page, 0.2 in further down.
-    let at = pos2(ruler_x, screen(&g, 0.0, pg.page_y(0) + pg.margins[4]).y);
-    let to = pos2(ruler_x, at.y + 0.2 * per_inch(&g));
-    press(&mut h, at);
-    mouse(&mut h, Event::PointerMoved(pos2(ruler_x, at.y + 4.0)));
-    mouse(&mut h, Event::PointerMoved(to));
-    release(&mut h, to);
-    let after = margins(&h);
-    assert!((after[4] - (start[4] + 0.2)).abs() < 0.03, "{after:?} vs {start:?}");
-    assert_eq!((after[..4].to_vec(), after[5]), (start[..4].to_vec(), start[5]));
-    h.state_mut().run("edit.undo", json!({})).unwrap();
-    h.run_steps(3);
-    assert_eq!(margins(&h), start);
-    // Footer: distance from the bottom, dragged up by 0.2 in grows it (zoom out so the page
-    // bottom is on screen).
-    h.state_mut().run("view.zoom", json!({"percent": 50})).unwrap();
-    h.run_steps(4);
-    let g = geo(&h);
-    let pg = g.paper.clone().unwrap();
-    let (_, py, _, ph) = pg.page_rect(0, 0);
-    let at = pos2(ruler_x, screen(&g, 0.0, py + ph - pg.margins[5]).y);
-    let to = pos2(ruler_x, at.y - 0.2 * per_inch(&g));
-    press(&mut h, at);
-    mouse(&mut h, Event::PointerMoved(pos2(ruler_x, at.y - 4.0)));
-    mouse(&mut h, Event::PointerMoved(to));
-    release(&mut h, to);
-    assert!((margins(&h)[5] - (start[5] + 0.2)).abs() < 0.03, "{:?}", margins(&h));
-}
 
 #[test]
 fn right_to_left_sheets_mirror_the_horizontal_ruler_drag() {

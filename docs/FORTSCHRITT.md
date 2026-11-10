@@ -57,3 +57,15 @@
   (deutsche Fehlernamen folgen in Phase 6).
 - Leiste bricht Gruppen in neue Zeilen um, ist so hoch wie nötig, höchstens 40 % des Fensters (sonst rollbar).
 - Hinweis für Phase 10: Mit allen Gruppen wird die Leiste mehrzeilig – Anordnung ist eine Designfrage.
+
+## Phase 5 – Formatierung (2026-11-10)
+- Gruppen „Schrift“ (Fett, Kursiv, Unterstrichen – eingedrückt, wenn aktiv; Größe 10–36; Textfarbe),
+  „Zellen“ (Hintergrund, Links/Mitte/Rechts, Euro €, Zellen verbinden/Verbindung trennen),
+  „Umrandung“ (Linie Dünn/Mittel/Dick, Linienfarbe, Außen/Innen/Alle/Keine), „Ansicht“ (Kleiner/Größer, 50–300 %).
+- Farbauswahl: GridCraft-Palette ohne „Weitere Farben“ (eine Ebene), Überschriften eingedeutscht.
+- Euro-Format `#,##0.00 "€"`, angezeigt `1.234,56 €`; Eingabe `12,5` → `12,50 €`. „Euro“ noch einmal = normale Zahl.
+- Verbinden warnt, wenn außer der Zelle oben links Inhalte verloren gingen.
+- Zahlen im Standardformat werden auch beim Spaltenanpassen deutsch gezeigt (Bildschirm und Druck).
+- Rechtsklick-Menüs auf die Funktionen der Leiste reduziert (deutsch, größere Einträge, keine Untermenüs).
+- Tests: Euro, Umrandung mit Dicke/Farbe + Rückgängig, Verbinden-Warnung, alle Formate nach Speichern/Öffnen, Zoom.
+  Entfernt: Tests des alten Rechtsklick-Menüs, der Seitenlayout-Lineale und der Formelobjekte.

@@ -132,54 +132,31 @@ pub(super) fn context_menu(app: &mut SheetApp, ui: &mut egui::Ui) {
             // On a cell with a link Excel offers to edit, open or remove it (#2120).
             let link =
                 app.session.active().and_then(|d| d.wb.active().and_then(|sh| sh.hyperlinks.get(&d.selection.active)).map(|l| l.target.clone()));
-            let mut items: Vec<(&str, &str)> = vec![
-                ("Cut", "edit.cut"),
-                ("Copy", "edit.copy"),
-                ("Paste", "edit.paste"),
-                ("Paste Special…", "ui:pasteSpecial"),
+            // SimpleGrid: nur die Funktionen der Schaltflächenleiste, ohne Untermenüs.
+            let _ = (insert_copied, &link);
+            let items: Vec<(&str, &str)> = vec![
+                ("Ausschneiden", "edit.cut"),
+                ("Kopieren", "edit.copy"),
+                ("Einfügen", "edit.paste"),
                 ("-", ""),
-                ("Insert…", "ui:insertCells"),
-                ("Delete…", "ui:deleteCells"),
-                ("Clear Contents", "edit.clearContents"),
+                ("Inhalt löschen", "edit.clearContents"),
                 ("-", ""),
-                ("Filter by Selected Cell's Value", "ui:filterValue"),
-                ("Sort A to Z", "data.sortAscending"),
-                ("Sort Z to A", "data.sortDescending"),
-                ("-", ""),
-                ("New Comment", "ui:newComment"),
-                ("New Note", "ui:newNote"),
-                ("-", ""),
-                ("Format Cells…", "ui:formatCells"),
-                ("Pick From Drop-down List…", "ui:pickList"),
-                ("Define Name…", "ui:defineName"),
-                ("Link…", "ui:insertLink"),
+                ("Zeile hinzufügen", "home.insertRows"),
+                ("Zeile entfernen", "ui:deleteRows"),
+                ("Spalte hinzufügen", "home.insertColumns"),
+                ("Spalte entfernen", "ui:deleteColumns"),
             ];
-            if let Some(item) = insert_copied {
-                items.insert(6, item);
-            }
-            if link.is_some()
-                && let Some(i) = items.iter().position(|(_, id)| *id == "ui:insertLink")
-            {
-                items.splice(
-                    i..=i,
-                    [("Edit Hyperlink…", "ui:insertLink"), ("Open Hyperlink", "ui:openLink"), ("Remove Hyperlink", "edit.clearHyperlinks")],
-                );
-            }
-            if show_details_offered(app)
-                && let Some(i) = items.iter().position(|(_, id)| *id == "data.sortDescending")
-            {
-                items.insert(i + 1, ("-", ""));
-                items.insert(i + 2, ("Show Details", "pivot.showDetails"));
-            }
             let lang = crate::i18n::current(ui.ctx());
             for (label, id) in items {
                 if label == "-" {
                     ui.separator();
                     continue;
                 }
-                if ui.add(egui::Button::new(lang.tr(label)).frame_when_inactive(false).min_size(vec2(190.0, 20.0))).clicked() {
+                if ui.add(egui::Button::new(lang.tr(label)).frame_when_inactive(false).min_size(vec2(220.0, 34.0))).clicked() {
                     close = true;
                     match id {
+                        "ui:deleteRows" => crate::einfach::entfernen(app, true),
+                        "ui:deleteColumns" => crate::einfach::entfernen(app, false),
                         "ui:pasteSpecial" => app.open_dialog("pasteSpecial", json!({})),
                         "ui:insertPaste" => app.open_dialog("insertPaste", json!({})),
                         "ui:insertCells" => app.open_dialog("insertCells", json!({})),
@@ -236,6 +213,7 @@ pub(super) fn context_menu(app: &mut SheetApp, ui: &mut egui::Ui) {
 /// is a value, subtotal or grand total cell of a PivotTable, or a cell of a report that is out of
 /// date, where running the command says so. Labels and headers of a current report don't offer it,
 /// and no cell does while the PivotTable's Enable show details option is off.
+#[allow(dead_code)] // SimpleGrid zeigt keine Pivot-Details
 fn show_details_offered(app: &mut SheetApp) -> bool {
     let Some(d) = app.session.active() else { return false };
     let (si, at) = (d.wb.active_sheet(), d.selection.active);
@@ -330,7 +308,7 @@ pub(super) fn fill_options_tag(app: &mut SheetApp, ui: &mut egui::Ui, geo: &Geo,
     egui::Popup::menu(&resp).show(|ui| {
         ui.set_min_width(190.0);
         for (label, mode) in modes {
-            if ui.add(egui::Button::new(lang.tr(label)).frame(false).min_size(vec2(180.0, 20.0))).clicked() {
+            if ui.add(egui::Button::new(lang.tr(label)).frame(false).min_size(vec2(220.0, 34.0))).clicked() {
                 chosen = Some(mode);
                 ui.close();
             }
@@ -367,7 +345,7 @@ pub(super) fn fill_menu(app: &mut SheetApp, ui: &mut egui::Ui, was_open: bool) {
                     ui.separator();
                     continue;
                 }
-                if ui.add(egui::Button::new(lang.tr(label)).frame(false).min_size(vec2(180.0, 20.0))).clicked() {
+                if ui.add(egui::Button::new(lang.tr(label)).frame(false).min_size(vec2(220.0, 34.0))).clicked() {
                     close = true;
                     if mode == "ui:series" {
                         let _ = app.session.run("selection.set", json!({"range": target.union(&src).a1(), "active": src.start.a1()}));
@@ -410,7 +388,7 @@ pub(super) fn object_menu(app: &mut SheetApp, ui: &mut egui::Ui) {
                     ui.separator();
                     continue;
                 }
-                if ui.add(egui::Button::new(lang.tr(label)).frame(false).min_size(vec2(190.0, 20.0))).clicked() {
+                if ui.add(egui::Button::new(lang.tr(label)).frame(false).min_size(vec2(220.0, 34.0))).clicked() {
                     close = true;
                     match action {
                         "ui:selectData" => app.open_dialog("selectData", json!({"chart": id})),
@@ -490,54 +468,44 @@ pub(super) fn header_menu(app: &mut SheetApp, ui: &mut egui::Ui, was_open: bool)
         egui::Frame::popup(ui.style()).show(ui, |ui| {
             ui.set_min_width(190.0);
             let insert_copied = insert_copied_item(app);
-            let mut items: Vec<(&str, &str)> = if rows {
+            // SimpleGrid: nur die Funktionen der Schaltflächenleiste, ohne Untermenüs.
+            let _ = insert_copied;
+            let items: Vec<(&str, &str)> = if rows {
                 vec![
-                    ("Cut", "edit.cut"),
-                    ("Copy", "edit.copy"),
-                    ("Paste", "edit.paste"),
+                    ("Ausschneiden", "edit.cut"),
+                    ("Kopieren", "edit.copy"),
+                    ("Einfügen", "edit.paste"),
                     ("-", ""),
-                    ("Header Menu|Insert", "home.insertRows"),
-                    ("Delete", "home.deleteRows"),
-                    ("Clear Contents", "edit.clearContents"),
+                    ("Zeile hinzufügen", "home.insertRows"),
+                    ("Zeile entfernen", "ui:deleteRows"),
+                    ("Inhalt löschen", "edit.clearContents"),
                     ("-", ""),
-                    ("Format Cells…", "ui:formatCells"),
-                    ("Row Height…", "ui:rowHeight"),
-                    ("AutoFit Row Height", "home.autofitRowHeight"),
-                    ("Hide", "home.hideRows"),
-                    ("Unhide", "home.unhideRows"),
-                    ("Group", "data.group"),
+                    ("Zeilenhöhe …", "ui:rowHeight"),
                 ]
             } else {
                 vec![
-                    ("Cut", "edit.cut"),
-                    ("Copy", "edit.copy"),
-                    ("Paste", "edit.paste"),
+                    ("Ausschneiden", "edit.cut"),
+                    ("Kopieren", "edit.copy"),
+                    ("Einfügen", "edit.paste"),
                     ("-", ""),
-                    ("Header Menu|Insert", "home.insertColumns"),
-                    ("Delete", "home.deleteColumns"),
-                    ("Clear Contents", "edit.clearContents"),
+                    ("Spalte hinzufügen", "home.insertColumns"),
+                    ("Spalte entfernen", "ui:deleteColumns"),
+                    ("Inhalt löschen", "edit.clearContents"),
                     ("-", ""),
-                    ("Format Cells…", "ui:formatCells"),
-                    ("Column Width…", "ui:columnWidth"),
-                    ("AutoFit Column Width", "home.autofitColumnWidth"),
-                    ("Hide", "home.hideColumns"),
-                    ("Unhide", "home.unhideColumns"),
-                    ("Sort A to Z", "data.sortAscending"),
-                    ("Group", "data.group"),
+                    ("Spaltenbreite …", "ui:columnWidth"),
                 ]
             };
-            if let Some(item) = insert_copied {
-                items.insert(5, item);
-            }
             let lang = crate::i18n::current(ui.ctx());
             for (label, id) in items {
                 if label == "-" {
                     ui.separator();
                     continue;
                 }
-                if ui.add(egui::Button::new(lang.tr(label)).frame_when_inactive(false).min_size(vec2(180.0, 20.0))).clicked() {
+                if ui.add(egui::Button::new(lang.tr(label)).frame_when_inactive(false).min_size(vec2(220.0, 34.0))).clicked() {
                     close = true;
                     match id {
+                        "ui:deleteRows" => crate::einfach::entfernen(app, true),
+                        "ui:deleteColumns" => crate::einfach::entfernen(app, false),
                         "ui:insertPaste" => app.open_dialog("insertPaste", json!({})),
                         "ui:rowHeight" => app.open_dialog("rowHeight", json!({})),
                         "ui:formatCells" => app.open_dialog("formatCells", json!({})),
