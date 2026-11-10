@@ -107,3 +107,24 @@
 - Tests: Sicherung/Wiederherstellung, Takt nur bei Änderungen, Aufräumen nach dem Speichern, Schließen fragt,
   Fehler → Sicherung, letzte Datei an/aus, Zeile mit Daten löschen → Rückgängig. Entfernt: Tests des alten
   Mehrfenster-Schließdialogs.
+
+## Phase 9 – Installer und Updates (2026-11-10)
+- GridCraft's Update-Mechanismus (craft-update, fragte die GridCraft-Server ab und hätte GridCraft installieren können)
+  ist entfernt, ebenso der WiX-Installer (`packaging/`).
+- Eigener Update-Dienst `crates/ui-egui/src/update.rs` mit Schnittstelle `UpdateQuelle` (GitHub-Releases von
+  `Devin-Schlichting/SimpleGrid`, ohne Zugangsschlüssel; Quelle in den Einstellungen änderbar). Abruf über das in
+  Windows enthaltene `curl.exe`, Prüfsumme SHA-256 aus `versionen.json`.
+- Oberfläche (`updates_ui.rs`): beim Start höchstens einmal am Tag (abschaltbar), still bei Fehlern/ohne Netz/
+  Anfragelimit; „Es gibt eine neue Version … Jetzt aktualisieren / Später“ → Speichern-Rückfrage → Laden und Prüfen
+  → stiller Installer (`/VERYSILENT … /STARTAPP`) → Programm startet neu. „Nach Updates suchen“ und Schalter unter
+  „Info und Einstellungen“. Falsche Prüfsumme: nichts wird installiert, deutsche Meldung, Protokolleintrag.
+- Inno-Setup-Skript `installer/SimpleGrid.iss`: pro Benutzer ohne Adminrechte nach `%LocalAppData%\Programs\SimpleGrid`,
+  feste AppId, Komponenten (Basis fest, Tabellen; Platz für das Textprogramm), Desktop-/Startmenü-Verknüpfung,
+  .xlsx-Zuordnung optional (aus), deutsche Oberfläche, Neustart nach stillem Update, saubere Deinstallation
+  (inkl. Sicherungen und Einstellungen). Rust-Programm ist eigenständig (keine Laufzeit nötig).
+- `installer/bauen.ps1` (Version, Tests, Release-Build, Installer, `versionen.json`) und GitHub-Aktion
+  `.github/workflows/release.yml` (bei Tag `vX.Y.Z`: bauen, testen, Release mit Setup.exe und versionen.json).
+- Version jetzt 0.1.0.
+- Tests: Update-Dienst mit Test-Quelle (neuer, gleich, kaputte Prüfsumme, kein Netz, Limit, GitHub-Antwort).
+- Noch nicht gemacht (braucht dein OK): Inno Setup installieren und Installer bauen/ausprobieren,
+  Push auf GitHub, erste Release und Probe-Update mit zwei Testversionen.

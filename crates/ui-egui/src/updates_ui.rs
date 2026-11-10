@@ -1,29 +1,33 @@
-//! One background check at startup (and on Help ▸ Check for Updates…) and the modal prompt that
-//! offers the new release: Update and Restart (direct self-update), Download or Later. The flow
-//! itself is `craft_update::updater::Updater`.
+//! SimpleGrid: Update-Suche in der Oberfläche. Höchstens einmal pro Tag automatisch beim Start
+//! (abschaltbar), jederzeit von Hand unter „Info und Einstellungen“. Die Arbeit macht
+//! [`crate::update`]; hier laufen nur Hintergrund-Threads, Rückfragen und Meldungen.
+//!
+//! Ablauf: neue Version → „Es gibt eine neue Version. Jetzt aktualisieren?“ → (ggf. Speichern-
+//! Rückfrage) → Installer laden und prüfen → still installieren → Programm startet neu. Ohne
+//! Zustimmung wird nie aktualisiert; ohne Internet bleibt die automatische Suche still.
 
-use craft_update::CheckResultResponse;
-use craft_update::updater::{Action, Status, Updater};
+use std::sync::mpsc::{Receiver, channel};
 
 use crate::SheetApp;
+use crate::update::{self, Ergebnis, Fehler, GithubQuelle, Release};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(Default)]
 pub(crate) struct Runtime {
-    updater: Updater,
-    /// The check at start was asked for; `tick` starts it with the context.
+    /// Beim Start prüfen (falls heute noch nicht geschehen).
     startup: bool,
-    /// Help ▸ Check for Updates… was chosen; the next `tick` starts it.
+    /// Von Hand prüfen (alle Ergebnisse melden).
     manual: bool,
+    /// Laufende Prüfung: (von Hand?, Ergebnis).
+    pruefung: Option<(bool, Receiver<Ergebnis>)>,
+    /// Laufender Download des Installers.
+    download: Option<Receiver<Result<std::path::PathBuf, Fehler>>>,
+    /// Die angebotene Version.
+    pub(crate) angebot: Option<Release>,
 }
 
-impl Default for Runtime {
-    fn default() -> Self {
-        Self { updater: Updater::new(&crate::UPDATE_APP, VERSION), startup: false, manual: false }
-    }
-}
-
-/// Ask for a check; the next frame's `tick` starts it. A manual one reports every outcome.
+/// Prüfung anfordern; der nächste `tick` startet sie.
 pub(crate) fn start(app: &mut SheetApp, manual: bool) {
     if manual {
         app.updates_rt.manual = true;
@@ -32,73 +36,98 @@ pub(crate) fn start(app: &mut SheetApp, manual: bool) {
     }
 }
 
+fn quelle(app: &SheetApp) -> GithubQuelle {
+    let repo = if app.ui.update_quelle.trim().is_empty() { update::STANDARD_QUELLE.to_string() } else { app.ui.update_quelle.clone() };
+    GithubQuelle { repo }
+}
+
 pub(crate) fn tick(app: &mut SheetApp, ctx: &egui::Context) {
-    let rt = &mut app.updates_rt;
-    if std::mem::take(&mut rt.manual) {
-        rt.updater.check_now(ctx);
-    } else if rt.startup {
-        rt.updater.check_at_start(ctx);
+    let heute = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let manual = std::mem::take(&mut app.updates_rt.manual);
+    let automatisch = std::mem::take(&mut app.updates_rt.startup)
+        && app.ui.update_automatisch
+        && !update::heute_schon_geprueft(&app.ui.update_zuletzt, &heute);
+    if (manual || automatisch) && app.updates_rt.pruefung.is_none() {
+        app.ui.update_zuletzt = heute;
+        let q = quelle(app);
+        let (tx, rx) = channel();
+        let ctx2 = ctx.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(update::pruefen(&q, VERSION));
+            ctx2.request_repaint();
+        });
+        app.updates_rt.pruefung = Some((manual, rx));
     }
-    rt.updater.tick(ctx);
-}
-
-/// Starts the helper of a ready update; it installs once the process has exited.
-pub(crate) fn start_pending_update(app: &mut SheetApp) {
-    app.updates_rt.updater.start_pending_update();
-}
-
-/// Whether the check result window shows: for every status but idle (a requested check, and the
-/// first start after an update, which reports that it installed or why it failed), and never
-/// over the startup prompt.
-fn result_window_shows(status: &Status, prompt_open: bool) -> bool {
-    !prompt_open && !matches!(status, Status::Idle)
-}
-
-pub(crate) fn show(app: &mut SheetApp, ctx: &egui::Context) {
-    // The close for a ready update waits until no workbook holds unsaved work.
-    let clean = !app.session.documents().iter().any(|d| d.is_dirty());
-    match app.updates_rt.updater.show_if(ctx, clean) {
-        Action::OpenUrl(url) => {
-            if let Some(open) = &app.services.open_url {
-                open(&url);
+    if let Some((manual, rx)) = &app.updates_rt.pruefung
+        && let Ok(ergebnis) = rx.try_recv()
+    {
+        let manual = *manual;
+        app.updates_rt.pruefung = None;
+        match ergebnis {
+            Ergebnis::Neuer(r) => {
+                app.einfach.frage = Some(crate::einfach::Frage::Update { version: r.version.clone() });
+                app.updates_rt.angebot = Some(r);
+            }
+            Ergebnis::Aktuell if manual => {
+                app.message = Some(("Updates".into(), format!("Sie haben bereits die neueste Version ({VERSION}).")));
+            }
+            Ergebnis::Aktuell => {}
+            Ergebnis::Fehler(e) => {
+                log::info!("Update-Suche: {e:?}");
+                if manual {
+                    app.message = Some(("Updates".into(), e.text().into()));
+                }
             }
         }
-        // Quit closes every workbook window. The install helper starts once the app exits.
-        Action::Close => app.request_quit(ctx),
-        Action::None => {}
     }
-    let rt = &mut app.updates_rt;
-    if result_window_shows(rt.updater.status(), rt.updater.prompt_open()) {
-        match craft_update::CheckResultDialog::new(&crate::UPDATE_APP, VERSION).show(ctx, rt.updater.status()) {
-            CheckResultResponse::Close => rt.updater.dismiss_status(),
-            CheckResultResponse::CheckAgain => rt.updater.check_now(ctx),
-            // The next `show_if` asks the window to close once nothing is unsaved.
-            CheckResultResponse::RestartToUpdate => rt.updater.restart_to_update(),
-            CheckResultResponse::None => {}
+    if let Some(rx) = &app.updates_rt.download
+        && let Ok(r) = rx.try_recv()
+    {
+        app.updates_rt.download = None;
+        match r {
+            Ok(installer) => installieren(app, &installer),
+            Err(e) => {
+                log::warn!("Update fehlgeschlagen: {e:?}");
+                app.message = Some(("Update".into(), e.text().into()));
+            }
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// „Jetzt aktualisieren“ nach der Speichern-Rückfrage: Installer im Hintergrund laden.
+pub(crate) fn herunterladen(app: &mut SheetApp, ctx: &egui::Context) {
+    let Some(r) = app.updates_rt.angebot.clone() else { return };
+    let q = quelle(app);
+    let ordner = std::env::temp_dir().join("SimpleGrid-Update");
+    let (tx, rx) = channel();
+    let ctx2 = ctx.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(update::installer_holen(&q, &r, &ordner));
+        ctx2.request_repaint();
+    });
+    app.updates_rt.download = Some(rx);
+    app.toast = Some(("Das Update wird geladen …".into(), crate::now_ms()));
+}
 
-    #[test]
-    fn result_window_shows_every_status_but_idle() {
-        let shown = [
-            Status::Checking,
-            Status::UpToDate,
-            Status::Failed("no network".into()),
-            Status::Installing,
-            Status::Ready,
-            Status::Managed,
-            Status::Updated("0.2.0".into()),
-            Status::InstallFailed("disk full".into()),
-        ];
-        for status in &shown {
-            assert!(result_window_shows(status, false), "{status:?}");
-            assert!(!result_window_shows(status, true), "{status:?} over the prompt");
+/// Startet den geprüften Installer still (er übernimmt die installierten Teile und startet
+/// SimpleGrid danach neu) und beendet das Programm.
+fn installieren(app: &mut SheetApp, installer: &std::path::Path) {
+    let mut cmd = std::process::Command::new(installer);
+    cmd.args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/STARTAPP"]);
+    match cmd.spawn() {
+        Ok(_) => {
+            app.allow_close = true;
+            app.einfach.jetzt_beenden = true;
         }
-        assert!(!result_window_shows(&Status::Idle, false));
+        Err(e) => {
+            log::warn!("Installer ließ sich nicht starten: {e}");
+            app.message = Some(("Update".into(), "Das Update ließ sich nicht starten. Ihre bisherige Version bleibt unverändert.".into()));
+        }
     }
 }
+
+/// Wird nicht mehr gebraucht (GridCraft's Selbst-Update); bleibt als leerer Einstiegspunkt.
+pub(crate) fn start_pending_update(_app: &mut SheetApp) {}
+
+/// Nichts zu zeichnen: Angebot und Meldungen laufen über die einfachen Rückfragen.
+pub(crate) fn show(_app: &mut SheetApp, _ctx: &egui::Context) {}

@@ -52,6 +52,8 @@ pub enum Danach {
     Oeffnen,
     /// Das Programm beenden.
     Beenden,
+    /// Das angebotene Update laden und installieren.
+    Aktualisieren,
 }
 
 /// Eine offene Rückfrage der einfachen Oberfläche.
@@ -65,6 +67,8 @@ pub enum Frage {
     Bestaetigen { titel: String, text: String, knopf: String, befehl: String, params: Json },
     /// Nach einem Absturz: die Sicherung wiederherstellen?
     Wiederherstellen { titel: String, zeit: String },
+    /// Eine neue Version ist da: jetzt aktualisieren?
+    Update { version: String },
 }
 
 /// Zustand der einfachen Oberfläche.
@@ -83,6 +87,8 @@ pub struct Zustand {
     pub jetzt_beenden: bool,
     /// Das Fenster „Info und Einstellungen“ ist offen.
     pub info_offen: bool,
+    /// Nach der Speichern-Rückfrage: das Update jetzt laden.
+    pub update_laden: bool,
 }
 
 /// Schriftgrößen zur Auswahl (feste Stufen).
@@ -580,6 +586,14 @@ fn info_fenster(app: &mut SheetApp, ctx: &egui::Context) {
         if ui.checkbox(&mut an, RichText::new("Beim Start die zuletzt benutzte Tabelle öffnen").font(theme::ui_font(masse::SCHRIFT))).changed() {
             app.ui.letzte_datei_oeffnen = an;
         }
+        let mut auto = app.ui.update_automatisch;
+        if ui.checkbox(&mut auto, RichText::new("Automatisch nach Updates suchen (einmal am Tag)").font(theme::ui_font(masse::SCHRIFT))).changed() {
+            app.ui.update_automatisch = auto;
+        }
+        ui.add_space(8.0);
+        if knopf(ui, "Nach Updates suchen", "Jetzt im Internet nachsehen, ob es eine neue Version gibt", None, false) {
+            app.check_for_updates();
+        }
         ui.add_space(16.0);
         if knopf(ui, "Schließen", "Dieses Fenster schließen", None, false) || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             offen = false;
@@ -804,6 +818,7 @@ fn ausfuehren(app: &mut SheetApp, danach: Danach) {
             app.allow_close = true;
             app.einfach.jetzt_beenden = true;
         }
+        Danach::Aktualisieren => app.einfach.update_laden = true,
     }
 }
 
@@ -814,6 +829,10 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
         app.einfach.sicherung.loeschen();
         ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Close);
     }
+    if std::mem::take(&mut app.einfach.update_laden) {
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::updates_ui::herunterladen(app, ctx);
+    }
     info_fenster(app, ctx);
     let Some(frage) = app.einfach.frage.clone() else { return };
     let (titel, text, knoepfe): (&str, String, Vec<&str>) = match &frage {
@@ -823,6 +842,11 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
         }
         Frage::BlattLoeschen { name, .. } => (texte::BLATT_LOESCHEN_TITEL, texte::BLATT_LOESCHEN_TEXT.replace("{}", name), vec![texte::LOESCHEN, texte::ABBRECHEN]),
         Frage::Bestaetigen { titel, text, knopf, .. } => (titel.as_str(), text.clone(), vec![knopf.as_str(), texte::ABBRECHEN]),
+        Frage::Update { version } => (
+            "Neue Version",
+            format!("Es gibt eine neue Version von SimpleGrid ({version}). Jetzt aktualisieren? Das Programm startet danach von selbst neu."),
+            vec!["Jetzt aktualisieren", "Später"],
+        ),
         Frage::Wiederherstellen { titel, zeit } => (
             "Tabelle wiederherstellen?",
             format!("SimpleGrid wurde beim letzten Mal nicht richtig beendet. Es gibt eine Sicherung von „{titel}“ vom {zeit}. Möchten Sie sie wiederherstellen?"),
@@ -871,6 +895,11 @@ pub fn rueckfragen(app: &mut SheetApp, ctx: &egui::Context) {
         Frage::Bestaetigen { knopf, befehl, params, .. } => {
             if wahl == knopf.as_str() {
                 app.run_or_alert(&befehl, params);
+            }
+        }
+        Frage::Update { .. } => {
+            if wahl == "Jetzt aktualisieren" {
+                neu_oder_oeffnen(app, Danach::Aktualisieren);
             }
         }
         Frage::Wiederherstellen { .. } => {

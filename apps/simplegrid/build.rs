@@ -15,9 +15,9 @@ fn main() {
     let mut res = winresource::WindowsResource::new();
     res.set_icon("../../assets/app-icon/simplegrid.ico")
         .set("ProductName", "SimpleGrid")
-        .set("FileDescription", "SimpleGrid spreadsheet")
-        .set("CompanyName", "Learning Machines LLC")
-        .set("LegalCopyright", "Copyright (c) the SimpleGrid authors. MIT OR Apache-2.0.")
+        .set("FileDescription", "SimpleGrid – einfaches Tabellenprogramm")
+        .set("CompanyName", "SimpleGrid")
+        .set("LegalCopyright", "Beruht auf GridCraft (c) the GridCraft authors. MIT OR Apache-2.0.")
         .set("OriginalFilename", "simplegrid.exe")
         .set("InternalName", "simplegrid");
     if let Err(e) = res.compile() {

@@ -4,7 +4,7 @@ members = ["crates/*", "apps/*"]
 default-members = ["crates/*", "apps/*"]
 
 [workspace.package]
-version = "0.16.0"
+version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.95"
@@ -25,10 +25,6 @@ simplegrid-ui-egui = { path = "crates/ui-egui" }
 simplegrid-mcp = { path = "crates/mcp" }
 simplegrid-pdf = { path = "crates/pdf" }
 simplegrid-math = { path = "crates/math" }
-# Every craft-libs crate (craft-update and craft-window here, craft-ui in ui-egui, craft-print in
-# the app) comes from one craft-libs revision.
-# craft-update: app-specific pretend versions apply to startup and manual checks.
-craft-update = { git = "https://github.com/storytold/craft-libs", rev = "1b34eba41e62138fc2438d2734523b302840b45d", version = "=0.1.0", features = ["egui"] }
 
 # foundation
 thiserror = "2"

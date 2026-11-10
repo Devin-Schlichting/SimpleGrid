@@ -6,14 +6,6 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
-/// SimpleGrid as craft-update knows it, with its 128 px icon and accent colour: the update
-/// prompt shows both, and an AppImage's menu entry gets the icon.
-#[cfg(not(target_arch = "wasm32"))]
-pub const UPDATE_APP: craft_update::app::App = craft_update::app::App {
-    icon_png: Some(include_bytes!("../../../assets/app-icon/hicolor/128x128/apps/simplegrid.png")),
-    accent: Some([0x1f, 0x9d, 0x55]),
-    ..craft_update::suite::GRIDCRAFT
-};
 
 pub mod backstage;
 mod border_preview;
@@ -53,6 +45,7 @@ pub mod printing;
 pub mod ribbon;
 pub mod seitenansicht;
 pub mod sicherung;
+pub mod update;
 pub mod selection_glide;
 pub mod tabs;
 pub mod text_box;
@@ -113,6 +106,15 @@ pub struct UiState {
     /// SimpleGrid: beim Start die zuletzt benutzte Tabelle wieder öffnen (abschaltbar).
     #[serde(default = "ja")]
     pub letzte_datei_oeffnen: bool,
+    /// SimpleGrid: beim Start (höchstens einmal am Tag) nach Updates suchen.
+    #[serde(default = "ja")]
+    pub update_automatisch: bool,
+    /// Tag der letzten automatischen Update-Suche („JJJJ-MM-TT“).
+    #[serde(default)]
+    pub update_zuletzt: String,
+    /// Update-Quelle „Besitzer/Repository“ auf GitHub (leer = Vorgabe).
+    #[serde(default)]
+    pub update_quelle: String,
     /// One-shot keytip request for a ribbon control: set when a keytip action resolves to
     /// [`keytips::Action::Control`], consumed (and cleared) by the control's render site.
     #[serde(skip)]
@@ -168,6 +170,9 @@ impl Default for UiState {
             autosave: false,
             recent: vec![],
             letzte_datei_oeffnen: true,
+            update_automatisch: true,
+            update_zuletzt: String::new(),
+            update_quelle: String::new(),
             keytip_invoke: None,
             keytip_invoke_next: None,
             language: i18n::Language::En,

@@ -41,7 +41,7 @@ simplegrid-xlsx = { workspace = true, features = ["test-support"] }
 zip = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-craft-update = { workspace = true }
+sha2 = { workspace = true }
 # The desktop's preferred language for the first-run interface language.
 sys-locale = { workspace = true }
 craft-window = { workspace = true }

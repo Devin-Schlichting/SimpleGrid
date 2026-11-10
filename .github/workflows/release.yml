@@ -1,0 +1,28 @@
+# Baut, testet und veröffentlicht SimpleGrid, sobald ein Versions-Tag (z. B. v1.2.0) hochgeladen wird.
+# Ergebnis: eine GitHub-Release mit SimpleGrid-Setup.exe und versionen.json (für die Update-Suche).
+# Benutzt nur das automatische GITHUB_TOKEN der Aktion – kein eigener Zugangsschlüssel.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Inno Setup installieren
+        run: choco install innosetup --no-progress -y
+      - name: Bauen, testen, Installer
+        shell: pwsh
+        run: ./installer/bauen.ps1 -Version "${{ github.ref_name }}"
+      - name: Release veröffentlichen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: gh release create "${{ github.ref_name }}" dist/SimpleGrid-Setup.exe dist/versionen.json --title "SimpleGrid ${{ github.ref_name }}" --notes "Neue Version von SimpleGrid."
