@@ -95,7 +95,12 @@ pub(crate) fn signature(name: &str, locale: FormulaLocale, language: Language) -
 /// A function's description in the interface language (English while untranslated).
 pub(crate) fn description(name: &str, locale: FormulaLocale, language: Language) -> Option<String> {
     let english = crate::formula_bar::function_description(locale.canonical_name(name))?;
-    Some(language.function_description(&english).map_or(english, str::to_string))
+    match language.function_description(&english) {
+        Some(t) => Some(t.to_string()),
+        // SimpleGrid: auf Deutsch keine englische Erklärung, nur die Schreibweise.
+        None if language == Language::De => None,
+        None => Some(english),
+    }
 }
 
 /// `SUM(number1, [number2], ...)` -> `SUM` and its arguments as written.

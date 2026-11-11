@@ -25,17 +25,6 @@ fn harness(active: &str) -> Harness {
     h
 }
 
-#[test]
-fn the_warning_button_converts_a_number_stored_as_text() {
-    let mut h = harness("B2");
-    h.get_by_label("Error checking options").click();
-    h.run_steps(3);
-    h.get_by_label("Convert to Number").click();
-    h.run_steps(3);
-    let v = h.state_mut().session.execute("cell.get", json!({"cell": "B2"})).unwrap()["value"].clone();
-    assert_eq!(v, json!(123.0));
-    assert!(h.query_by_label("Error checking options").is_none(), "the button goes once the number is a number");
-}
 
 #[test]
 fn text_that_is_not_a_number_gets_no_button() {

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 mod cs;
 mod de;
+mod de_functions;
 mod el;
 mod es;
 mod es_functions;
@@ -247,6 +248,7 @@ impl Language {
     fn function_help(self) -> Option<(HelpTable, HelpTable)> {
         match self {
             Self::Es => Some((es_functions::DESCRIPTIONS, es_functions::ARGUMENTS)),
+            Self::De => Some((de_functions::DESCRIPTIONS, de_functions::ARGUMENTS)),
             _ => None,
         }
     }

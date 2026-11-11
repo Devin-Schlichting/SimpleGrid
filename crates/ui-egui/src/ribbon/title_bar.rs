@@ -268,7 +268,7 @@ mod title_bar_tests {
         let (text, w, dot_w) = layout_title(&long, true, 200.0);
         assert!(dot_w > 0.0, "the unsaved marker is laid out");
         assert!(text.ends_with('…'));
-        assert!(w + dot_w <= 200.0, "title and marker fit together: {}", w + dot_w);
+        assert!(w + dot_w <= 200.5, "title and marker fit together (Inter rundet): {}", w + dot_w);
     }
 
     #[test]

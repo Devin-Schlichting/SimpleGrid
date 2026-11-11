@@ -580,37 +580,8 @@ fn palette(ui: &mut Ui, theme_colors: &[u32; 12], none_label: &str, more_colors:
 
 /// Draws the modal warning/error message; OK, Enter or Esc clears it and restores editor focus when an edit exists.
 pub fn message_box(app: &mut SheetApp, ctx: &egui::Context) {
-    let Some((title, msg)) = app.message.clone() else { return };
-    let title = app.ui.language.tr(&title).to_owned();
-    let msg = app.ui.language.tr_error(&msg);
-    let mut close = false;
-    egui::Modal::new(egui::Id::unique("message_box")).show(ctx, |ui| {
-        ui.set_width(380.0);
-        ui.horizontal(|ui| {
-            let (r, _) = ui.allocate_exact_size(vec2(36.0, 36.0), Sense::hover());
-            let t = Tokens::get(ui.ctx());
-            ui.painter().circle_filled(r.center(), 16.0, t.warning);
-            ui.painter().text(r.center(), Align2::CENTER_CENTER, "!", theme::ui_bold(20.0), t.on_warning);
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new(title).strong());
-                ui.add(egui::Label::new(msg).wrap());
-            });
-        });
-        ui.add_space(8.0);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button("  OK  ").clicked() || ui.input(|i| i.key_pressed(egui::Key::Enter) || i.key_pressed(egui::Key::Escape)) {
-                close = true;
-            }
-        });
-    });
-    if close {
-        app.message = None;
-        // Back to the entry the message was about (a validation alert, a formula error), so it can
-        // be fixed from the keyboard without clicking the cell again.
-        if let Some(ed) = &mut app.editor {
-            ed.request_focus = true;
-        }
-    }
+    // SimpleGrid: große, deutsche Meldungen im Stil der Rückfragen.
+    crate::einfach::meldungsfenster(app, ctx);
 }
 
 /// Shows a translated toast for 2.5 seconds and clears it after the deadline.
@@ -620,14 +591,15 @@ pub fn toast(app: &mut SheetApp, ctx: &egui::Context) {
         app.toast = None;
         return;
     }
-    let msg = app.ui.language.tr_error(&msg);
+    // SimpleGrid: deutsch und groß.
+    let msg = crate::einfach::deutsche_meldung(app, &msg);
     let Some(rect) = app.grid.rect else { return };
-    egui::Area::new(egui::Id::unique("toast")).fixed_pos(pos2(rect.center().x - 160.0, rect.bottom() - 48.0)).order(egui::Order::Tooltip).show(
+    egui::Area::new(egui::Id::unique("toast")).fixed_pos(pos2(rect.center().x - 240.0, rect.bottom() - 80.0)).order(egui::Order::Tooltip).show(
         ctx,
         |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.set_max_width(320.0);
-                ui.label(msg);
+            egui::Frame::popup(ui.style()).inner_margin(egui::Margin::symmetric(20, 14)).corner_radius(12.0).show(ui, |ui| {
+                ui.set_max_width(480.0);
+                ui.label(egui::RichText::new(msg).font(theme::ui_font(19.0)));
             });
         },
     );

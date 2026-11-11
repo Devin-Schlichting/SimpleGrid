@@ -616,6 +616,36 @@ impl Session {
             }
         }
     }
+    /// SimpleGrid: shows the workbook `new` in the windows of `old` instead and closes `old`, so
+    /// "Neu"/"Öffnen" replace the table in the same window rather than opening another one.
+    /// The windows `new` got when it was opened go away. Unknown uids are ignored.
+    pub fn replace_document(&mut self, old: u64, new: u64) {
+        if old == new || self.document_index(new).is_none() || self.windows.iter().all(|w| w.doc_uid != old) {
+            return;
+        }
+        self.windows.retain(|w| w.doc_uid != new);
+        let mut ziel = None;
+        for w in self.windows.iter_mut().filter(|w| w.doc_uid == old) {
+            w.doc_uid = new;
+            ziel = Some(w.id);
+        }
+        if let Some(i) = self.document_index(old) {
+            let d = self.docs.remove(i);
+            self.groups.retain(|g| g.doc != d.uid);
+            if self.macro_debug.as_ref().is_some_and(|m| m.doc == d.uid) {
+                self.macro_debug = None;
+            }
+        }
+        // The most recently active of those windows shows the new workbook's live view.
+        let ziel = self.doc_window(new).or(ziel);
+        for w in self.windows.iter_mut().filter(|w| w.doc_uid == new) {
+            w.reset_view(Some(w.id) == ziel);
+        }
+        match ziel {
+            Some(id) => self.activate_window(id),
+            None => self.activate_recent(),
+        }
+    }
     /// A new blank workbook titled `BookN`.
     pub fn new_workbook(&mut self) -> usize {
         let book = self.prefs.book_name_stem.clone();

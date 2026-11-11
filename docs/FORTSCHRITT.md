@@ -175,3 +175,20 @@
 - Bei jeder Eingabe in eine Zelle erscheinen direkt darunter ein grüner Haken (übernehmen, wie Enter) und ein
   rotes Kreuz (verwerfen, wie Esc) – ganz ohne Tastatur bedienbar.
 - Tests: 3106 grün.
+
+## Version 0.2.2 – Fehlerliste (2026-11-11)
+Umsetzung von `docs/FEHLERLISTE.md`:
+1. Funktionshinweis deutsch (Erklärung und Argumentnamen für die gängigen Funktionen); ohne Übersetzung nur die Schreibweise.
+2. Grüner Haken / rotes Kreuz rechts neben dem Eingabefeld, nicht mehr vom Hinweis verdeckt.
+3. Jedes Zahlenformat mit „€“ (auch Excel „Buchhaltung“/„Währung“) gilt als Euro; der Knopf ist dann grün.
+4. Kopfzeile schmaler (56 px), Logo, Name und Datei-Knöpfe auf einer Linie.
+5. Druckbereich als grüner gestrichelter Rahmen mit Schild „Druckbereich“ (nur Bildschirm).
+7. Beim Eintippen wird eine zu schmale Spalte automatisch breiter (nur breiter, mit Rückgängig zurücknehmbar).
+9. Alle Meldungen im großen Stil der Rückfragen.
+12./13. Ausfüllkästchen und grüne Fehlerdreiecke abgeschaltet.
+14. Häufige englische Meldungen übersetzt, sonst „Das hat leider nicht geklappt.“ (Original ins Protokoll).
+15. Per Ziehen/Doppelklick geöffnete Dateien kommen in ein eigenes Fenster; „Neu“/„Öffnen“ ersetzen nur die Tabelle
+    im aktuellen Fenster. Die Speichern-Rückfrage beim Schließen eines Fensters ist groß und deutsch.
+16. Oberflächenschrift Inter 4.1 (OFL) eingebettet, Lizenz in `assets/fonts/Inter-OFL.txt` und `ATTRIBUTION.md`.
+18. Release-Aktion: `actions/checkout@v5`, `Swatinem/rust-cache`; Pushes auf `main` bauen ohne Veröffentlichung
+    (füllt den Zwischenspeicher, den die Tags nutzen).

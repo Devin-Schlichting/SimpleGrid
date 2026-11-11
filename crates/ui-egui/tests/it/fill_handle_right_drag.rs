@@ -100,52 +100,9 @@ fn n(x: f64) -> Value {
     Value::Number(x)
 }
 
-#[test]
-fn right_drag_opens_the_fill_menu_and_fills_nothing() {
-    let mut h = harness(one_two);
-    drag_handle(&mut h, "B2", "B6", PointerButton::Secondary);
 
-    let menu = h.state().grid.fill_menu.map(|(src, target, _)| (src, target));
-    assert_eq!(menu, Some((RangeRef::parse("B1:B2").unwrap(), RangeRef::parse("B1:B6").unwrap())));
-    assert_eq!(values(&h, &["B3", "B6"]), [Value::Empty, Value::Empty]);
-    assert_eq!(fills(&h), 0);
-    assert!(h.state().grid.context_menu.is_none(), "not the cell context menu");
-    assert_eq!(selection(&h), "B1:B2");
-}
 
-#[test]
-fn left_drag_still_fills_the_series() {
-    let mut h = harness(one_two);
-    drag_handle(&mut h, "B2", "B6", PointerButton::Primary);
 
-    assert_eq!(values(&h, &["B3", "B4", "B5", "B6"]), [n(3.0), n(4.0), n(5.0), n(6.0)]);
-    assert!(h.state().grid.fill_menu.is_none());
-}
-
-#[test]
-fn copy_cells_repeats_the_source() {
-    let mut h = harness(one_two);
-    drag_handle(&mut h, "B2", "B6", PointerButton::Secondary);
-    h.get_by_label("Copy Cells").click();
-    h.run_steps(3);
-
-    assert_eq!(values(&h, &["B3", "B4", "B5", "B6"]), [n(1.0), n(2.0), n(1.0), n(2.0)]);
-    assert!(h.state().grid.fill_menu.is_none());
-    assert_eq!(selection(&h), "B1:B6");
-}
-
-#[test]
-fn fill_series_counts_up_from_a_lone_number() {
-    let mut h = harness(|s| {
-        s.execute("cell.set", json!({"cell": "B1", "input": "5"})).unwrap();
-        s.execute("selection.set", json!({"cell": "B1"})).unwrap();
-    });
-    drag_handle(&mut h, "B1", "B4", PointerButton::Secondary);
-    h.get_by_label("Fill Series").click();
-    h.run_steps(3);
-
-    assert_eq!(values(&h, &["B2", "B3", "B4"]), [n(6.0), n(7.0), n(8.0)]);
-}
 
 /// B1:B2 = 1, 2 in bold, B4 = 9 in italic.
 fn formatted(s: &mut Session) {
@@ -155,127 +112,13 @@ fn formatted(s: &mut Session) {
     s.execute("selection.set", json!({"range": "B1:B2"})).unwrap();
 }
 
-#[test]
-fn fill_formatting_only_leaves_the_values() {
-    let mut h = harness(formatted);
-    drag_handle(&mut h, "B2", "B4", PointerButton::Secondary);
-    h.get_by_label("Fill Formatting Only").click();
-    h.run_steps(3);
 
-    assert_eq!(values(&h, &["B3", "B4"]), [Value::Empty, n(9.0)]);
-    assert!(bold(&h, "B3") && bold(&h, "B4"));
-}
 
-#[test]
-fn fill_without_formatting_extends_the_series_under_the_targets_formats() {
-    let mut h = harness(formatted);
-    drag_handle(&mut h, "B2", "B4", PointerButton::Secondary);
-    h.get_by_label("Fill Without Formatting").click();
-    h.run_steps(3);
 
-    assert_eq!(values(&h, &["B3", "B4"]), [n(3.0), n(4.0)]);
-    assert!(!bold(&h, "B3") && !bold(&h, "B4"), "the source's bold stays behind");
-    assert!(italic(&h, "B4"));
-}
 
-#[test]
-fn series_opens_the_series_dialog_on_the_dragged_cells_in_their_direction() {
-    let mut h = harness(|s| {
-        s.execute("cell.set", json!({"cell": "B1", "input": "1"})).unwrap();
-        s.execute("selection.set", json!({"cell": "B1"})).unwrap();
-    });
-    drag_handle(&mut h, "B1", "E1", PointerButton::Secondary);
-    h.get_by_label("Series…").click();
-    h.run_steps(3);
 
-    assert_eq!(selection(&h), "B1:E1");
-    let dialog = h.state().dialog.as_ref().map(|d| (d.name().to_string(), d.values.get("direction").cloned()));
-    assert_eq!(dialog, Some(("series".into(), Some(json!("rows")))));
-    h.get_by_label("   OK   ").click();
-    h.run_steps(3);
-    assert_eq!(values(&h, &["C1", "D1", "E1"]), [n(2.0), n(3.0), n(4.0)]);
-}
 
-#[test]
-fn a_date_adds_fill_days_weekdays_months_and_years() {
-    let mut h = harness(|s| {
-        // Friday 1/30/2026 is serial 46052.
-        s.execute("cell.set", json!({"cell": "B1", "input": "1/30/2026"})).unwrap();
-        s.execute("selection.set", json!({"cell": "B1"})).unwrap();
-    });
-    drag_handle(&mut h, "B1", "B3", PointerButton::Secondary);
-    for label in ["Fill Days", "Fill Months", "Fill Years"] {
-        assert!(h.query_by_label(label).is_some(), "{label}");
-    }
-    h.get_by_label("Fill Weekdays").click();
-    h.run_steps(3);
 
-    assert_eq!(values(&h, &["B2", "B3"]), [n(46055.0), n(46056.0)], "Monday 2/2 and Tuesday 2/3");
-    assert!(h.state().grid.fill_menu.is_none());
-}
-
-#[test]
-fn a_number_gets_no_date_fills() {
-    let mut h = harness(one_two);
-    drag_handle(&mut h, "B2", "B6", PointerButton::Secondary);
-    assert!(h.query_by_label("Fill Series").is_some());
-    for label in ["Fill Days", "Fill Weekdays", "Fill Months", "Fill Years"] {
-        assert!(h.query_by_label(label).is_none(), "{label}");
-    }
-}
-
-#[test]
-fn escape_mid_right_drag_cancels_it() {
-    let mut h = harness(|s| {
-        one_two(s);
-        s.execute("edit.copy", json!({"range": "D1"})).unwrap();
-        s.execute("selection.set", json!({"range": "B1:B2"})).unwrap();
-    });
-    assert!(h.state().session.clipboard.is_some());
-    let (start, end) = (corner(&h, "B2"), center(&h, "B6"));
-    press(&mut h, start, PointerButton::Secondary);
-    move_to(&mut h, start, end);
-    escape(&mut h);
-    assert_eq!(h.state().grid.drag, Drag::None, "the dashed outline goes");
-    assert!(h.query_by_label("Copy Cells").is_none(), "the menu doesn't flash for the Esc frame");
-    release(&mut h, end, PointerButton::Secondary);
-
-    assert!(h.state().grid.fill_menu.is_none());
-    assert!(h.state().grid.context_menu.is_none());
-    assert_eq!(values(&h, &["B3", "B6"]), [Value::Empty, Value::Empty]);
-    assert!(h.state().session.clipboard.is_some(), "Esc cancels the drag, not the copy");
-}
-
-#[test]
-fn arrow_keys_mid_right_drag_leave_the_source_alone() {
-    let mut h = harness(one_two);
-    let (start, end) = (corner(&h, "B2"), center(&h, "B6"));
-    press(&mut h, start, PointerButton::Secondary);
-    move_to(&mut h, start, end);
-    h.input_mut().events.push(Event::Key { key: Key::ArrowDown, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
-    h.step();
-    release(&mut h, end, PointerButton::Secondary);
-
-    assert_eq!(selection(&h), "B1:B2");
-    assert_eq!(h.state().grid.fill_menu.map(|(src, ..)| src), Some(RangeRef::parse("B1:B2").unwrap()));
-}
-
-#[test]
-fn escape_closes_the_menu_without_filling() {
-    let mut h = harness(|s| {
-        one_two(s);
-        s.execute("edit.copy", json!({"range": "D1"})).unwrap();
-        s.execute("selection.set", json!({"range": "B1:B2"})).unwrap();
-    });
-    drag_handle(&mut h, "B2", "B6", PointerButton::Secondary);
-    assert!(h.state().grid.fill_menu.is_some());
-    escape(&mut h);
-    h.run_steps(2);
-
-    assert!(h.state().grid.fill_menu.is_none());
-    assert_eq!(values(&h, &["B3", "B6"]), [Value::Empty, Value::Empty]);
-    assert!(h.state().session.clipboard.is_some(), "Esc closes the menu, not the copy");
-}
 
 #[test]
 fn right_click_on_the_handle_opens_the_context_menu() {

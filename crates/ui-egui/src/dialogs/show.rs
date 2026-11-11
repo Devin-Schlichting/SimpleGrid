@@ -140,6 +140,15 @@ pub fn show(app: &mut SheetApp, ctx: &egui::Context) {
         }
         return;
     }
+    // SimpleGrid: die Speichern-Rückfrage groß und deutsch.
+    if d.name == "saveChanges" {
+        let titel = d.values.get("title").and_then(Json::as_str).unwrap_or("Mappe").to_string();
+        let quitting = d.values.get("quit").and_then(Json::as_bool) == Some(true);
+        if crate::einfach::speichern_frage(app, ctx, &titel, quitting) && app.dialog.is_none() {
+            app.dialog = Some(d);
+        }
+        return;
+    }
     if d.name == "pasteSpecial" {
         paste_special_shortcuts(&mut d, ctx);
     }

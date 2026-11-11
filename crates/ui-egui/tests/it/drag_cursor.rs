@@ -133,23 +133,6 @@ fn a_new_press_does_not_treat_a_clicks_transient_state_as_a_drag() {
     assert_eq!(h.state().grid.drag, Drag::None);
 }
 
-#[test]
-fn fill_keeps_crosshair_and_still_extends_a_series() {
-    let mut h = harness();
-    h.state_mut().session.execute("selection.set", json!({"range": "A2:B2"})).unwrap();
-    h.run_steps(2);
-    let start = selection_rect(&h).right_bottom();
-    press(&mut h, start);
-    let target = cell(&h, "E2").center();
-    move_with_cursor(&mut h, target, CursorIcon::Crosshair);
-    assert!(matches!(h.state().grid.drag, Drag::Fill { .. }));
-    move_with_cursor(&mut h, target + vec2(1.0, 0.0), CursorIcon::Crosshair);
-    button(&mut h, target, false);
-    assert_eq!(h.state().grid.drag, Drag::None);
-    assert_cursor(&h, CursorIcon::Cell);
-    let sh = h.state().session.active().unwrap().wb.active().unwrap();
-    assert_eq!((0..5).map(|c| sh.value(CellRef::new(1, c))).collect::<Vec<_>>(), (1..=5).map(|n| Value::Number(n as f64)).collect::<Vec<_>>());
-}
 
 #[test]
 fn moving_a_selection_keeps_move_and_still_moves_cells() {

@@ -11,6 +11,12 @@ use serde_json::{Value as Json, json};
 use crate::SheetApp;
 use crate::theme::{self, Tokens};
 
+/// Das kleine Ausfüllkästchen an der Markierung (Ziehen füllt Zellen weiter). Abgeschaltet: zu klein
+/// und leicht aus Versehen gezogen; sein englisches Menü entfällt damit auch.
+pub const AUSFUELLKAESTCHEN: bool = false;
+/// GridCraft's Hintergrund-Fehlerprüfung (grüne Ecken bei „Zahl als Text“ mit englischem Menü). Abgeschaltet.
+pub const FEHLERPRUEFUNG: bool = false;
+
 /// Zentrale Maße der einfachen Oberfläche. Eine Änderung hier wirkt auf alle Schaltflächen.
 pub mod masse {
     /// Mindesthöhe einer Schaltfläche in Punkten.
@@ -126,6 +132,27 @@ pub fn uebersetzung(text: &str) -> Option<&'static str> {
         "Close" => "Schließen",
         "Ready" => "Bereit",
         "Theme Colors" => "Farben",
+        // Häufige Meldungen der Engine (Nr. 14).
+        "The workbook is protected and cannot be changed." => "Die Tabelle ist geschützt und kann nicht geändert werden.",
+        "A workbook must contain at least one visible worksheet." => "Das letzte Blatt kann nicht gelöscht werden.",
+        "A sheet name can't be blank." => "Der Blattname darf nicht leer sein.",
+        "A sheet name can't be longer than 31 characters." => "Der Blattname darf höchstens 31 Zeichen lang sein.",
+        "A sheet name can't contain any of these characters: : \\ / ? * [ ]" => "Der Blattname darf diese Zeichen nicht enthalten: : \\ / ? * [ ]",
+        "A sheet name can't begin or end with an apostrophe." => "Der Blattname darf nicht mit einem Apostroph beginnen oder enden.",
+        "That name is already taken. Try a different one." => "Diesen Namen gibt es schon. Bitte einen anderen wählen.",
+        "Reference isn't valid." => "Der Bezug ist ungültig.",
+        "Nothing to paste." => "Es wurde noch nichts kopiert.",
+        "This value doesn't match the data validation restrictions defined for this cell." => "Dieser Wert ist in dieser Zelle nicht erlaubt.",
+        "This action won't work on multiple selections." => "Das geht nur, wenn ein einziger Bereich markiert ist.",
+        "The cell or chart you're trying to change is on a protected sheet." => "Die Zelle ist auf einem geschützten Blatt und kann nicht geändert werden.",
+        "To prevent possible loss of data, SimpleGrid cannot shift nonblank cells off of the worksheet." => "Das geht nicht: Dabei würden Zellen mit Inhalt über den Rand der Tabelle geschoben.",
+        "To prevent possible loss of data, columns cannot be shifted off of the worksheet." => "Das geht nicht: Dabei würden Spalten mit Inhalt über den Rand der Tabelle geschoben.",
+        "The copied cells don't fit on the sheet at this position." => "Das Kopierte passt an dieser Stelle nicht auf das Blatt.",
+        "The copied cells don't fit here: paste them where the whole copied area fits on the sheet." => "Das Kopierte passt hier nicht hin. Bitte weiter oben oder links einfügen.",
+        "The cut rows or columns can't be inserted inside themselves." => "Ausgeschnittene Zeilen oder Spalten können nicht in sich selbst eingefügt werden.",
+        "The number must be between 1 and 409." => "Die Zahl muss zwischen 1 und 409 liegen.",
+        "Select an available printer in File > Print before submitting." => "Bitte in der Seitenansicht zuerst einen Drucker wählen.",
+        "Printing is unavailable here; export a PDF instead." => "Drucken geht hier nicht. Bitte „Als PDF speichern“ benutzen.",
         "Standard Colors" => "Kräftige Farben",
         "Recent Colors" => "Zuletzt benutzt",
         "Printer" => "Drucker",
@@ -366,10 +393,12 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
     if !niedrig {
         egui::Panel::top("simplegrid_kopf")
             .resizable(false)
-            .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(20, 10)))
+            .exact_size(56.0)
+            .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(20, 0)))
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    logo(ui, 36.0);
+                // Alles auf einer Linie: senkrecht mittig in der 56 px hohen Kopfzeile.
+                ui.horizontal_centered(|ui| {
+                    logo(ui, 32.0);
                     ui.add_space(4.0);
                     let mut job = egui::text::LayoutJob::default();
                     job.append("Simple", 0.0, egui::TextFormat { font_id: theme::ui_bold(24.0), color: t.text, ..Default::default() });
@@ -389,10 +418,9 @@ pub fn leiste(app: &mut SheetApp, ui: &mut Ui) {
                         ui.label(RichText::new(text).font(theme::ui_bold(17.0)).color(farbe));
                         ui.add_space(16.0);
                         // Neu, Öffnen, Speichern, Speichern unter: immer sichtbar, unabhängig vom Register.
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().item_spacing.x = 8.0;
-                            datei(app, ui);
-                        });
+                        // Direkt in der rechtsbündigen Zeile, damit die Knöpfe mittig sitzen.
+                        ui.spacing_mut().item_spacing.x = 8.0;
+                        datei(app, ui);
                     });
                 });
             });
@@ -550,7 +578,7 @@ fn kopfknopf(ui: &mut Ui, text: &str, tipp: &str, aus: Option<&str>) -> bool {
     let icon = 24.0;
     let breite = 14.0 + icon + 8.0 + galley.size().x + 16.0;
     let sense = if aus.is_some() { egui::Sense::hover() } else { egui::Sense::click() };
-    let (rect, r) = ui.allocate_exact_size(vec2(breite, 48.0), sense);
+    let (rect, r) = ui.allocate_exact_size(vec2(breite, 40.0), sense);
     let (fill, rand) = if aus.is_none() && r.is_pointer_button_down_on() {
         (t.pressed, t.accent)
     } else if aus.is_none() && r.hovered() {
@@ -629,6 +657,7 @@ pub fn oeffnen_pfad(app: &mut SheetApp, pfad: &str) {
         return;
     }
     let alte: Vec<u64> = app.session.documents().iter().map(|d| d.uid).collect();
+    let vorher = app.session.active().map(|d| d.uid);
     app.message = None;
     app.open_path(pfad);
     let neu = app.session.active().map(|d| d.uid);
@@ -639,13 +668,9 @@ pub fn oeffnen_pfad(app: &mut SheetApp, pfad: &str) {
         }
         return;
     }
-    // Die bisherige Tabelle schließen: SimpleGrid zeigt immer genau eine.
-    let mut i = app.session.documents().len();
-    while i > 0 {
-        i -= 1;
-        if app.session.documents().get(i).is_some_and(|d| alte.contains(&d.uid)) {
-            app.session.close_document(i);
-        }
+    // Die neue Tabelle ersetzt die bisherige im selben Fenster; andere Fenster bleiben.
+    if let (Some(v), Some(n)) = (vorher, neu) {
+        app.session.replace_document(v, n);
     }
     app.follow_active_window();
     // Hinweise beim Einlesen (z. B. Diagramme aus einer .ods-Datei) auf Deutsch zusammenfassen:
@@ -769,7 +794,7 @@ fn zellen(app: &mut SheetApp, ui: &mut Ui) {
             app.run_or_alert(id, json!({}));
         }
     }
-    let euro = st.num_fmt.as_str() == simplegrid_engine::core::locale::EURO_FORMAT;
+    let euro = ist_euro_format(st.num_fmt.as_str());
     if knopf(ui, "Euro €", "Zahlen als Geldbetrag zeigen, z. B. 1.234,56 € (noch einmal klicken: normale Zahl)", ohne, euro) {
         euro_umschalten(app, euro);
     }
@@ -790,6 +815,12 @@ fn verbinden_knoepfe(app: &mut SheetApp, ui: &mut Ui) {
     if knopf(ui, "Verbindung trennen", "Verbundene Zellen wieder in einzelne Zellen teilen", trennen_aus, false) {
         app.run_or_alert("home.unmergeCells", json!({}));
     }
+}
+
+/// Ob ein Zahlenformat Euro zeigt: SimpleGrid's eigenes, aber auch Excel's „Buchhaltung“ und
+/// „Währung“ mit € (z. B. `_-* #,##0.00 €_-;…` oder `[$€-407]`).
+pub fn ist_euro_format(code: &str) -> bool {
+    code.contains('€')
 }
 
 /// „Euro“: an → Euro-Format; noch einmal → normale Zahl.
@@ -958,6 +989,28 @@ fn info_fenster(app: &mut SheetApp, ctx: &egui::Context) {
     app.einfach.info_offen = offen;
 }
 
+/// Ein festgelegter Druckbereich bekommt am Bildschirm einen kräftigen grünen, gestrichelten
+/// Rahmen und oben links ein Schild „Druckbereich“. Gedruckt wird beides nicht.
+pub(crate) fn druckbereich_rahmen(ui: &Ui, geo: &crate::grid::Geo, sh: &simplegrid_engine::model::Sheet) {
+    let Some(bereich) = sh.print.print_area else { return };
+    let r = geo.range_rect(sh, bereich);
+    if !r.is_positive() || !r.intersects(geo.cells) {
+        return;
+    }
+    let gruen = egui::Color32::from_rgb(0x04, 0x78, 0x57);
+    let p = ui.painter().with_clip_rect(geo.cells);
+    let ecken = [r.left_top(), r.right_top(), r.right_bottom(), r.left_bottom(), r.left_top()];
+    for paar in ecken.windows(2) {
+        p.extend(egui::Shape::dashed_line(&[paar[0], paar[1]], egui::Stroke::new(3.0, gruen), 10.0, 6.0));
+    }
+    let schrift = theme::ui_bold(13.0);
+    let galley = p.layout_no_wrap("Druckbereich".to_string(), schrift, egui::Color32::WHITE);
+    let schild = egui::Rect::from_min_size(egui::pos2(r.left(), r.top() - galley.size().y - 6.0), galley.size() + vec2(12.0, 6.0));
+    let schild = if schild.top() < geo.cells.top() { schild.translate(vec2(0.0, galley.size().y + 8.0)) } else { schild };
+    p.rect_filled(schild, 4.0, gruen);
+    p.galley(schild.min + vec2(6.0, 3.0), galley, egui::Color32::WHITE);
+}
+
 /// Die Klartext-Erklärung zum Fehlerwert der markierten Zelle, z. B. „Durch Null geteilt …“.
 pub fn fehler_erklaerung(app: &SheetApp) -> Option<String> {
     let d = app.session.active()?;
@@ -1088,13 +1141,16 @@ fn eingabe_knoepfe(app: &mut SheetApp, ctx: &egui::Context) {
         app.einfach.summe_ziel = None;
         return;
     };
-    let Some(rect) = app.grid.geo.as_ref().and_then(|g| app.session.active().and_then(|d| d.wb.active()).map(|sh| g.cell_rect(sh, ziel))) else { return };
+    // Rechts neben dem tatsächlichen Eingabefeld (es wächst mit dem Text); darunter bleibt Platz
+    // für den Funktionshinweis.
+    let feld: Option<egui::Rect> = ctx.data(|d| d.get_temp(egui::Id::unique("simplegrid.cell_editor.rect")));
+    let Some(rect) = feld.or_else(|| app.grid.geo.as_ref().and_then(|g| app.session.active().and_then(|d| d.wb.active()).map(|sh| g.cell_rect(sh, ziel)))) else { return };
     let t = Tokens::get(ctx);
     let mut uebernehmen = false;
     let mut verwerfen = false;
     egui::Area::new(egui::Id::unique("simplegrid.summe_knoepfe"))
         .order(egui::Order::Foreground)
-        .fixed_pos(egui::pos2(rect.left(), rect.bottom() + 6.0))
+        .fixed_pos(egui::pos2(rect.right() + 8.0, rect.center().y - 30.0))
         .show(ctx, |ui| {
             egui::Frame::NONE.fill(egui::Color32::WHITE).stroke(egui::Stroke::new(1.5, t.ribbon_border)).corner_radius(12.0).inner_margin(6.0).shadow(egui::epaint::Shadow { offset: [0, 3], blur: 10, spread: 0, color: egui::Color32::from_black_alpha(40) }).show(ui, |ui| {
                 ui.horizontal(|ui| {
@@ -1263,6 +1319,111 @@ fn blaetter(app: &mut SheetApp, ui: &mut Ui) {
     }
 }
 
+/// Ob ein Meldungstext (noch) englisch ist: nur ASCII-Zeichen und typisch englische Wörter.
+fn ist_englisch(text: &str) -> bool {
+    let t = format!(" {} ", text.to_ascii_lowercase());
+    text.is_ascii() && [" the ", " is ", " can't ", " cannot ", " must ", " not ", " no ", " to ", " a ", " an ", " select ", " couldn't ", " failed", " invalid", " unable"].iter().any(|w| t.contains(w))
+}
+
+/// Eine Meldung auf Deutsch: übersetzt, sonst (falls noch englisch) eine allgemeine deutsche
+/// Meldung; der Originaltext geht ins Protokoll.
+pub fn deutsche_meldung(app: &SheetApp, text: &str) -> String {
+    let t = crate::i18n::Language::De.tr_error(text);
+    if ist_englisch(&t) {
+        log::info!("Meldung (englisch, ersetzt): {text}");
+        let _ = app;
+        "Das hat leider nicht geklappt.".to_string()
+    } else {
+        t
+    }
+}
+
+/// Das große Meldungsfenster (ersetzt GridCraft's kleines): Titel, Text, grüner „OK“-Knopf.
+pub fn meldungsfenster(app: &mut SheetApp, ctx: &egui::Context) {
+    let Some((titel, text)) = app.message.clone() else { return };
+    let titel = match crate::i18n::Language::De.tr(&titel) {
+        "SimpleGrid" | "" => texte::HINWEIS_TITEL.to_string(),
+        t if ist_englisch(t) => texte::HINWEIS_TITEL.to_string(),
+        t => t.to_string(),
+    };
+    let text = deutsche_meldung(app, &text);
+    let mut zu = false;
+    egui::Modal::new(egui::Id::unique("simplegrid.meldung"))
+        .frame(egui::Frame::NONE.fill(egui::Color32::WHITE).stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(0xD1, 0xD5, 0xDB))).inner_margin(egui::Margin::same(36)).corner_radius(18.0))
+        .show(ctx, |ui| {
+            ui.set_width(600.0);
+            ui.horizontal(|ui| {
+                let (r, _) = ui.allocate_exact_size(vec2(56.0, 56.0), egui::Sense::hover());
+                ui.painter().circle(r.center(), 27.0, egui::Color32::from_rgb(0xFE, 0xF3, 0xC7), egui::Stroke::new(3.0, egui::Color32::from_rgb(0xD9, 0x77, 0x06)));
+                ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "i", theme::ui_bold(32.0), egui::Color32::from_rgb(0x92, 0x40, 0x0E));
+                ui.add_space(10.0);
+                ui.label(RichText::new(&titel).font(theme::ui_bold(28.0)));
+            });
+            ui.add_space(14.0);
+            ui.add(egui::Label::new(RichText::new(&text).font(theme::ui_font(21.0))).wrap());
+            ui.add_space(20.0);
+            if dialogknopf(ui, "OK", 0) || ui.input(|i| i.key_pressed(egui::Key::Enter) || i.key_pressed(egui::Key::Escape)) {
+                zu = true;
+            }
+        });
+    if zu {
+        app.message = None;
+        // Zurück zur Eingabe, um die es ging (wie bei GridCraft).
+        if let Some(ed) = &mut app.editor {
+            ed.request_focus = true;
+        }
+    }
+}
+
+/// Die Speichern-Rückfrage beim Schließen eines Fensters (GridCraft's „saveChanges“) im großen,
+/// deutschen Stil. Gibt `false` zurück, wenn sie beantwortet ist.
+pub fn speichern_frage(app: &mut SheetApp, ctx: &egui::Context, titel: &str, quitting: bool) -> bool {
+    let mut antwort = None;
+    egui::Modal::new(egui::Id::unique("simplegrid.speichernfrage"))
+        .frame(
+            egui::Frame::NONE
+                .fill(egui::Color32::WHITE)
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(0xD1, 0xD5, 0xDB)))
+                .inner_margin(egui::Margin::same(36))
+                .corner_radius(18.0),
+        )
+        .show(ctx, |ui| {
+            ui.set_width(640.0);
+            ui.horizontal(|ui| {
+                let (r, _) = ui.allocate_exact_size(vec2(56.0, 56.0), egui::Sense::hover());
+                ui.painter().circle(r.center(), 27.0, egui::Color32::from_rgb(0xFE, 0xF3, 0xC7), egui::Stroke::new(3.0, egui::Color32::from_rgb(0xD9, 0x77, 0x06)));
+                ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, "!", theme::ui_bold(32.0), egui::Color32::from_rgb(0x92, 0x40, 0x0E));
+                ui.add_space(10.0);
+                ui.label(RichText::new(texte::UNGESPEICHERT_TITEL).font(theme::ui_bold(30.0)));
+            });
+            ui.add_space(14.0);
+            ui.add(egui::Label::new(RichText::new(texte::UNGESPEICHERT_TEXT.replace("{}", titel)).font(theme::ui_font(21.0))).wrap());
+            ui.add_space(20.0);
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = vec2(14.0, 10.0);
+                for (i, (k, a)) in [
+                    (texte::SPEICHERN, crate::SaveAnswer::Save),
+                    (texte::NICHT_SPEICHERN, crate::SaveAnswer::DontSave),
+                    (texte::ABBRECHEN, crate::SaveAnswer::Cancel),
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    if dialogknopf(ui, k, i) {
+                        antwort = Some(a);
+                    }
+                }
+            });
+            if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                antwort = Some(crate::SaveAnswer::Cancel);
+            }
+        });
+    match antwort {
+        Some(a) => !app.answer_save_changes(a, quitting, ctx),
+        None => true,
+    }
+}
+
 /// Ein Knopf in einer Rückfrage: der erste ist die Hauptaktion (grün gefüllt), „Nicht speichern“
 /// und „Löschen“/„Entfernen“ sind rot umrandet, „Abbrechen“ und „Später“ grau.
 fn dialogknopf(ui: &mut Ui, text: &str, nr: usize) -> bool {
@@ -1296,15 +1457,18 @@ pub fn neu_oder_oeffnen(app: &mut SheetApp, danach: Danach) {
     }
 }
 
-/// Ersetzt die aktuelle Tabelle durch eine neue bzw. eine geöffnete. SimpleGrid zeigt immer genau
-/// eine Tabelle; das vermeidet versteckte Fenster.
+/// Ersetzt die Tabelle im aktuellen Fenster durch eine neue bzw. eine geöffnete. Weitere Fenster
+/// (per Ziehen oder Doppelklick geöffnet) bleiben unberührt.
 fn ausfuehren(app: &mut SheetApp, danach: Danach) {
     match danach {
         Danach::Neu => {
-            if app.session.active().is_some() {
-                app.run_or_alert("file.close", json!({"force": true, "document": true}));
-            }
+            let vorher = app.session.active().map(|d| d.uid);
             app.run_or_alert("file.new", json!({}));
+            let neu = app.session.active().map(|d| d.uid);
+            if let (Some(v), Some(n)) = (vorher, neu) {
+                app.session.replace_document(v, n);
+            }
+            app.follow_active_window();
         }
         Danach::Oeffnen => oeffnen(app),
         Danach::Beenden => {
@@ -1551,6 +1715,22 @@ mod tests {
         neu_oder_oeffnen(&mut a, Danach::Neu);
         assert!(a.einfach.frage.is_none());
         assert_eq!(a.session.documents().len(), 1);
+    }
+
+    #[test]
+    fn neu_ersetzt_nur_die_mappe_im_aktuellen_fenster() {
+        let mut a = app();
+        let erstes = a.session.active_window();
+        a.run_or_alert("file.new", json!({}));
+        let zweites = a.session.active_window();
+        assert_ne!(erstes, zweites);
+        a.run_or_alert("cell.set", json!({"cell": "A1", "value": "x"}));
+        let alt = a.session.active().map(|d| d.uid);
+        ausfuehren(&mut a, Danach::Neu);
+        assert_eq!(a.session.documents().len(), 2, "das andere Fenster bleibt");
+        assert_eq!(a.session.active_window(), zweites, "gleiches Fenster");
+        assert_ne!(a.session.active().map(|d| d.uid), alt, "neue Mappe darin");
+        assert!(a.session.active().is_some_and(|d| !d.is_dirty()));
     }
 
     #[test]

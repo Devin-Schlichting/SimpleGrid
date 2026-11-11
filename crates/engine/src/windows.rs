@@ -39,6 +39,14 @@ pub struct WindowState {
     last_active: u64,
 }
 
+impl WindowState {
+    /// SimpleGrid: after the window was pointed at another workbook, `live` makes it the one
+    /// whose view is the workbook's own; any other starts on that workbook's first sheet.
+    pub(crate) fn reset_view(&mut self, live: bool) {
+        self.view = if live { None } else { Some(WindowView { selection: Selection::default(), sheet: 0, sheet_name: String::new(), sheet_selections: Vec::new() }) };
+    }
+}
+
 impl WindowView {
     fn capture(d: &DocState) -> WindowView {
         WindowView {

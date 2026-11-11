@@ -11,7 +11,7 @@ use simplegrid_ui_egui::i18n::Language;
 
 type Harness = egui_kittest::Harness<'static, SheetApp>;
 
-const MESSAGE: &str = "This value doesn't match the data validation restrictions defined for this cell.";
+const MESSAGE: &str = "Dieser Wert ist in dieser Zelle nicht erlaubt.";
 
 /// A1 holds 5 and accepts whole numbers from 1 to 10 (Stop alert).
 fn harness() -> Harness {

@@ -566,7 +566,7 @@ fn save_in_the_question_saves_the_macro_then_the_workbook_asks_about_itself() {
     assert!(h.state().macros.editor.is_none());
     assert_eq!(h.state().session.active().unwrap().wb.macros.len(), 1);
     assert_eq!(h.state().dialog.as_ref().map(|d| d.name()), Some("saveChanges"));
-    h.get_all_by_role_and_label(egui::Role::Button, "Save").last().unwrap().click();
+    h.get_all_by_role_and_label(egui::Role::Button, "Speichern").last().unwrap().click();
     h.run_steps(4);
     assert!(!is_open(&h, book));
     let mut s = Session::new();

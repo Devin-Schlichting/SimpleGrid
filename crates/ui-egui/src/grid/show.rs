@@ -376,6 +376,8 @@ fn show_grid_interactions(app: &mut SheetApp, ui: &mut egui::Ui, resp: &egui::Re
     }
     update_cursor(app, ui, resp, geo, sh);
     crate::text_box::show(app, ui, geo, sh);
+    // SimpleGrid: festgelegten Druckbereich sichtbar machen (nur am Bildschirm).
+    crate::einfach::druckbereich_rahmen(ui, geo, sh);
     if app.editor.as_ref().is_some_and(|e| !e.from_formula_bar) {
         in_cell_editor(app, ui, geo, sh, wb);
     }
@@ -386,7 +388,9 @@ fn show_grid_interactions(app: &mut SheetApp, ui: &mut egui::Ui, resp: &egui::Re
     fill_menu(app, ui, previous_popups.3 == app.grid.fill_menu);
     fill_options_tag(app, ui, geo, sh);
     object_menu(app, ui);
-    error_check_tag(app, ui, geo, sh);
+    if crate::einfach::FEHLERPRUEFUNG {
+        error_check_tag(app, ui, geo, sh);
+    }
 }
 
 fn update_zoom_glide(app: &mut SheetApp, ui: &egui::Ui, place: (u64, usize), zoom: u16, now: f64) {

@@ -522,6 +522,19 @@ pub(super) fn font_definitions_impl(
     // script faces: whatever a cell can draw, the formula bar can draw too, even where no script
     // fallback face was found (#349: macOS UI font without Hebrew, cells in Arial with it).
     bind_cell_fallback(&mut fonts, &fallback);
+    // SimpleGrid: die Oberflächenschrift ist Inter (eingebettet, OFL); fehlende Zeichen kommen aus
+    // der bisherigen Kette. Die Tests ohne Systemschriften bleiben unverändert.
+    if system {
+        for (role, key, bytes) in [
+            (UI, "Inter-Regular", &include_bytes!("../../../../assets/fonts/Inter-Regular.ttf")[..]),
+            (UI_BOLD, "Inter-Bold", &include_bytes!("../../../../assets/fonts/Inter-Bold.ttf")[..]),
+        ] {
+            fonts.font_data.insert(key.into(), std::sync::Arc::new(FontData::from_static(bytes)));
+            if let Some(chain) = fonts.families.get_mut(&FontFamily::Name(role.into())) {
+                chain.insert(0, key.into());
+            }
+        }
+    }
     // Default proportional text in widgets uses the UI font.
     if let Some(ui) = fonts.families.get(&FontFamily::Name(UI.into())).cloned() {
         fonts.families.insert(FontFamily::Proportional, ui);

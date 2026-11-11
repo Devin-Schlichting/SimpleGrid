@@ -196,7 +196,16 @@ impl SheetApp {
         } else if fill_selection {
             self.session.run("range.fill", json!({"input": text}))
         } else {
-            self.session.run("cell.set", json!({"cell": ed.cell.a1(), "input": text, "array": array}))
+            // SimpleGrid: Eingabe und ggf. Verbreitern der Spalte (statt ########) als ein Schritt.
+            let gruppe = self.session.group_begin("Eingabe").ok();
+            let r = self.session.run("cell.set", json!({"cell": ed.cell.a1(), "input": text, "array": array}));
+            if r.is_ok() {
+                let _ = self.session.run("home.growColumnToFit", json!({"cell": ed.cell.a1(), "sheet": ed.sheet}));
+            }
+            if let Some(g) = gruppe {
+                let _ = self.session.group_end(g);
+            }
+            r
         };
         match r {
             Ok(_) => {

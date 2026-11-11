@@ -6,6 +6,9 @@ name: Release
 on:
   push:
     tags: ["v*.*.*"]
+    # Auf main nur bauen (ohne Veröffentlichung): füllt den Zwischenspeicher, den die Tags nutzen.
+    branches: [main]
+    paths-ignore: ["docs/**", "*.md"]
 
 permissions:
   contents: write
@@ -14,14 +17,17 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      # Zwischenstände des Rust-Baus aufbewahren: spätere Releases bauen deutlich schneller.
+      - uses: Swatinem/rust-cache@v2
       - name: Inno Setup installieren
         run: choco install innosetup --no-progress -y
       - name: Bauen, testen, Installer
         shell: pwsh
-        run: ./installer/bauen.ps1 -Version "${{ github.ref_name }}"
+        run: ./installer/bauen.ps1 -Version "${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}"
       - name: Release veröffentlichen
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh

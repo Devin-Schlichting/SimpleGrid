@@ -178,6 +178,15 @@ pub fn specs() -> Vec<CommandSpec> {
         ),
         cmd!("home.autofitRowHeight", "AutoFit Row Height", ["Home", "Cells", "Format"], None, "{sheet?, rows?}", has_doc, autofit_rows),
         cmd!("home.autofitColumnWidth", "AutoFit Column Width", ["Home", "Cells", "Format"], None, "{sheet?, cols?}", has_doc, autofit_cols),
+        cmd!(
+            "home.growColumnToFit",
+            "Grow Column To Fit",
+            [],
+            None,
+            "{cell, sheet?} SimpleGrid: widens the cell's column so its displayed value fits; never narrows; nothing when it fits",
+            has_doc,
+            grow_column_to_fit
+        ),
         cmd!("home.defaultWidth", "Default Width…", ["Home", "Cells", "Format"], None, "{sheet?, width: 64 (pixels)}", has_doc, default_width),
         cmd!("home.hideRows", "Hide Rows", ["Home", "Cells", "Format", "Hide & Unhide"], Some("Cmd+9"), "{sheet?, rows?}", has_doc, |s, p| hide(
             s, p, true, true
@@ -820,7 +829,7 @@ mod sizes;
 use cell_styles::cell_style;
 pub use cell_styles::{CELL_STYLE_NAMES, builtin_cell_style};
 pub use sizes::{approx_text_width, chars_to_points};
-use sizes::{autofit_cols, autofit_rows, col_width, default_width, hide, row_height};
+use sizes::{autofit_cols, autofit_rows, col_width, default_width, grow_column_to_fit, hide, row_height};
 
 #[cfg(test)]
 mod tests {

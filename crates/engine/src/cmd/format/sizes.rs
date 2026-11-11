@@ -1,3 +1,5 @@
+use serde_json::json;
+
 use super::{
     CellRef, EngineError, Json, RangeRef, Result, Session, StyleId, bad, edit, f64_param, parse_lines, split_sheet, str_param, target_sheet,
 };
@@ -183,6 +185,44 @@ fn arabic_em(c: char) -> Option<f32> {
         '\u{0600}'..='\u{06FF}' | '\u{0750}'..='\u{077F}' | '\u{0870}'..='\u{08FF}' | '\u{FB50}'..='\u{FDFF}' | '\u{FE70}'..='\u{FEFC}' => Some(0.48),
         _ => None,
     }
+}
+
+/// SimpleGrid: verbreitert die Spalte einer Zelle, bis ihr angezeigter Wert hineinpasst (statt
+/// `########`). Nie schmaler; passt es schon, ändert sich nichts (kein Rückgängig-Schritt).
+/// Verbundene und umbrechende Zellen bleiben, wie sie sind.
+pub(super) fn grow_column_to_fit(s: &mut Session, p: &Json) -> Result<Json> {
+    let si = target_sheet(s, p)?;
+    let cell = str_param(p, "cell").and_then(|c| CellRef::parse(split_sheet(c).1)).ok_or_else(|| bad("home.growColumnToFit", "missing or invalid `cell`"))?;
+    let measure = s.text_width.clone();
+    let d = s.doc()?;
+    let Some(sh) = d.wb.sheet(si) else { return Ok(Json::Null) };
+    if sh.merge_at(cell).is_some_and(|m| !m.is_single()) {
+        return Ok(Json::Null);
+    }
+    let st = d.wb.styles.get(sh.style_id(cell));
+    if st.align.wrap {
+        return Ok(Json::Null);
+    }
+    let text = crate::display::cell_text(&d.wb, sh, cell);
+    let breite = text
+        .lines()
+        .map(|line| match &measure {
+            Some(m) => m(line, &st.font, true),
+            None => approx_text_width(line, st.font.size, st.font.bold),
+        })
+        .fold(0.0_f32, f32::max)
+        + 8.0
+        + st.align.indent as f32 * 9.0;
+    if text.is_empty() || breite <= sh.col_width(cell.col) || !breite.is_finite() {
+        return Ok(Json::Null);
+    }
+    let neu = breite.clamp(8.0, 1785.0).ceil();
+    edit(s, |cx| {
+        let e = cx.sheet_mut(si)?.cols.entry(cell.col).or_default();
+        e.size = Some(neu);
+        e.hidden = false;
+        Ok(json!({"width": neu}))
+    })
 }
 
 /// Distinct texts AutoFit measures exactly; past this many, `Session::text_width` is asked for a

@@ -35,7 +35,6 @@ mod dialog_move;
 mod drag_cursor;
 mod equation_editor;
 mod file_menu;
-mod fill_handle_double_click;
 mod fill_handle_right_drag;
 mod fill_options_button;
 mod filter_list_scroll;

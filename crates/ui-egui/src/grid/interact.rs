@@ -75,7 +75,8 @@ pub(super) fn interact(app: &mut SheetApp, ui: &mut egui::Ui, resp: &egui::Respo
     }
     let sel = app.session.active().map(|d| d.selection.clone()).unwrap_or_default();
     let cur_rect = geo.range_rect(sh, sel.current());
-    let handle = Rect::from_center_size(cur_rect.right_bottom(), vec2(9.0, 9.0));
+    // SimpleGrid: ohne Ausfüllkästchen gibt es nichts zu greifen.
+    let handle = if crate::einfach::AUSFUELLKAESTCHEN { Rect::from_center_size(cur_rect.right_bottom(), vec2(9.0, 9.0)) } else { Rect::NOTHING };
     // The fill handle and the move border only react in the panes where they are painted, not
     // over the frozen rows/columns that a scrolled selection lies under.
     let handle_panes = geo.range_panes(RangeRef::cell(sel.current().end));
