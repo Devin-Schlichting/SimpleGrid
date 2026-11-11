@@ -200,6 +200,10 @@ impl SheetApp {
             let gruppe = self.session.group_begin("Eingabe").ok();
             let r = self.session.run("cell.set", json!({"cell": ed.cell.a1(), "input": text, "array": array}));
             if r.is_ok() {
+                // Lange Zahlen ganz zeigen statt 1,2346E+12: Format „0“ (bzw. mit Nachkommastellen).
+                if let Some(code) = crate::einfach::zahl_ganz_zeigen(&self.session, ed.sheet, ed.cell) {
+                    let _ = self.session.run("home.numberFormat", json!({"range": ed.cell.a1(), "sheet": ed.sheet, "code": code}));
+                }
                 let _ = self.session.run("home.growColumnToFit", json!({"cell": ed.cell.a1(), "sheet": ed.sheet}));
             }
             if let Some(g) = gruppe {

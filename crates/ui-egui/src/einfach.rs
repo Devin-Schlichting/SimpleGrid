@@ -1136,8 +1136,27 @@ pub fn summe(app: &mut SheetApp) {
 
 /// Grüner Haken und rotes Kreuz neben der Zelle, die gerade bearbeitet wird (jede Eingabe, auch
 /// eine vorgelegte Summe): übernehmen wie Enter, verwerfen wie Esc – ganz ohne Tastatur.
+/// Das Zahlenformat, mit dem eine eben eingetippte lange Zahl ganz statt wissenschaftlich
+/// (1,2346E+12) erscheint – nur bei Standardformat und Zahlen bis 15 Stellen.
+pub fn zahl_ganz_zeigen(session: &simplegrid_engine::Session, sheet: usize, zelle: simplegrid_engine::core::CellRef) -> Option<String> {
+    let d = session.active()?;
+    let sh = d.wb.sheet(sheet)?;
+    let v = sh.value(zelle).as_f64()?;
+    if d.wb.styles.get(sh.style_id(zelle)).num_fmt.as_str() != "General" || !(1.0..1e15).contains(&v.abs()) {
+        return None;
+    }
+    if !simplegrid_engine::display::cell_text(&d.wb, sh, zelle).contains(['E', 'e']) {
+        return None;
+    }
+    // Höchstens 15 gültige Stellen, wie Excel sie speichert.
+    let ganz = v.abs().trunc().to_string().len();
+    let nachkomma = 15usize.saturating_sub(ganz);
+    Some(if v.fract() == 0.0 || nachkomma == 0 { "0".into() } else { format!("0.{}", "#".repeat(nachkomma)) })
+}
+
 fn eingabe_knoepfe(app: &mut SheetApp, ctx: &egui::Context) {
-    let Some(ziel) = app.editor.as_ref().filter(|e| !e.from_formula_bar).map(|e| e.cell) else {
+    // Haken und Kreuz nur beim Eintippen einer Formel (Text beginnt mit „=“).
+    let Some(ziel) = app.editor.as_ref().filter(|e| !e.from_formula_bar && e.text.trim_start().starts_with('=')).map(|e| e.cell) else {
         app.einfach.summe_ziel = None;
         return;
     };
@@ -1662,6 +1681,32 @@ mod tests {
         let mut a = SheetApp::new(session, Services::default());
         a.ui.language = crate::i18n::Language::De;
         a
+    }
+
+    #[test]
+    fn lange_zahl_wird_ganz_gezeigt_und_ist_ein_schritt() {
+        let mut a = app();
+        a.begin_edit(Some("1234567891234".into()), false);
+        assert!(a.commit_edit(0, 0, false, false));
+        let d = a.session.active().unwrap();
+        let sh = d.wb.active().unwrap();
+        let a1 = simplegrid_engine::core::CellRef::parse("A1").unwrap();
+        assert_eq!(simplegrid_engine::display::cell_text(&d.wb, sh, a1), "1234567891234");
+        assert!(sh.col_width(0) > 64.0, "Spalte wurde breiter: {}", sh.col_width(0));
+        a.run_or_alert("edit.undo", json!({}));
+        let d = a.session.active().unwrap();
+        assert!(!d.is_dirty(), "ein Rückgängig nimmt alles zurück");
+    }
+
+    #[test]
+    fn kurze_zahl_behaelt_das_standardformat() {
+        let mut a = app();
+        a.begin_edit(Some("12345".into()), false);
+        assert!(a.commit_edit(0, 0, false, false));
+        let d = a.session.active().unwrap();
+        let sh = d.wb.active().unwrap();
+        let a1 = simplegrid_engine::core::CellRef::parse("A1").unwrap();
+        assert_eq!(d.wb.styles.get(sh.style_id(a1)).num_fmt.as_str(), "General");
     }
 
     fn blaetter(app: &SheetApp) -> Vec<String> {

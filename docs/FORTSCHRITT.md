@@ -192,3 +192,9 @@ Umsetzung von `docs/FEHLERLISTE.md`:
 16. Oberflächenschrift Inter 4.1 (OFL) eingebettet, Lizenz in `assets/fonts/Inter-OFL.txt` und `ATTRIBUTION.md`.
 18. Release-Aktion: `actions/checkout@v5`, `Swatinem/rust-cache`; Pushes auf `main` bauen ohne Veröffentlichung
     (füllt den Zwischenspeicher, den die Tags nutzen).
+
+## Version 0.2.3 (2026-11-11)
+- Update 0.2.1 → 0.2.2 auf dem echten PC durchgespielt: gefunden, still installiert, Neustart mit der offenen Datei.
+- Lange Zahlen (z. B. 1234567891234) erscheinen beim Eintippen ganz statt als 1,2346E+12: Format „0“ und breitere
+  Spalte, mit einem Rückgängig zurücknehmbar.
+- Grüner Haken / rotes Kreuz nur noch beim Eintippen einer Formel (beginnt mit „=“).
